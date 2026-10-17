@@ -1,0 +1,17 @@
+# Store all text files with LF line endings (Linux CI and Windows behave the same).
+* text=auto eol=lf
+
+# Windows-only scripts need CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files: never convert line endings, never show text diffs.
+*.keras  binary
+*.tflite binary
+*.onnx   binary
+*.npz    binary
+*.pgm    binary
+*.jpg    binary
+*.jpeg   binary
+*.png    binary
