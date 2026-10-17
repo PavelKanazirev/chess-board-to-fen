@@ -1,5 +1,7 @@
 # chess-board-to-fen
 
+[![CI](https://github.com/PavelKanazirev/chess-board-to-fen/actions/workflows/ci.yml/badge.svg)](https://github.com/PavelKanazirev/chess-board-to-fen/actions/workflows/ci.yml)
+
 > **Status: work in progress.** This project is being built step by step, one pull request at a time. See the [roadmap](#roadmap).
 
 **Goal:** take a photo or screenshot of a chessboard and output the position as a [FEN](https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation) string, using a small neural network deployed with **TensorFlow Lite** and **ONNX Runtime**, from Python and from C++.
