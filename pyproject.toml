@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "board2fen"
+version = "0.1.0"
+description = "Chessboard image -> FEN with a tiny CNN, deployed with TensorFlow Lite and ONNX Runtime"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+authors = [{ name = "Pavel Kanazirev" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=9.0", "ruff>=0.17"]
+
+[tool.setuptools.packages.find]
+include = ["board2fen*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
