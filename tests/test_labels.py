@@ -7,6 +7,7 @@ from board2fen.labels import (
     board_to_labels,
     labels_to_board,
     labels_to_fen,
+    lichess_analysis_url,
     square_of_index,
 )
 
@@ -79,3 +80,9 @@ def test_wrong_number_of_labels_is_rejected():
 def test_invalid_turn_is_rejected():
     with pytest.raises(ValueError):
         labels_to_fen([0] * 64, turn="white")
+
+
+def test_lichess_url_has_no_spaces():
+    url = lichess_analysis_url(chess.STARTING_FEN)
+    assert url.startswith("https://lichess.org/analysis/")
+    assert " " not in url

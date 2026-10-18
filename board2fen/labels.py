@@ -61,3 +61,8 @@ def labels_to_fen(labels: Sequence[int], turn: str = "w", flipped: bool = False)
     board.castling_rights = chess.BB_CORNERS
     board.castling_rights = board.clean_castling_rights()
     return board.fen()
+
+
+def lichess_analysis_url(fen: str) -> str:
+    """A link that opens the position on the lichess.org analysis board."""
+    return "https://lichess.org/analysis/" + fen.replace(" ", "_")
