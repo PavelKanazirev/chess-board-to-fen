@@ -16,6 +16,8 @@ jobs:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: pyproject.toml
+      - name: Install fonts with chess glyphs
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-dejavu-core
       - name: Install
         run: pip install -e ".[dev]"
       - name: Lint (ruff)
