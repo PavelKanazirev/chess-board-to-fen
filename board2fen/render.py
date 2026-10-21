@@ -35,6 +35,16 @@ FONT_DIRS = (
 # (light square, dark square) colours as (red, green, blue).
 DEFAULT_THEME = ((240, 217, 181), (181, 136, 99))
 
+THEMES = (
+    DEFAULT_THEME,  # brown
+    ((238, 238, 210), (118, 150, 86)),  # green
+    ((222, 227, 230), (140, 162, 173)),  # blue-grey
+    ((240, 240, 240), (170, 140, 200)),  # purple
+    ((249, 229, 198), (209, 139, 71)),  # wood
+    ((255, 255, 255), (150, 150, 150)),  # black-and-white print
+)
+HIGHLIGHT = (205, 210, 106)  # the yellow tint many sites use to mark the last move
+
 
 def has_chess_glyphs(font_path: str | Path) -> bool:
     """True if the font really draws chess pieces.
@@ -86,23 +96,52 @@ def draw_piece(
     draw.text((x, y), glyph, font=font, fill=fill, stroke_width=max(1, size // 32), stroke_fill=(0, 0, 0))
 
 
+def draw_coordinates(
+    draw: ImageDraw.ImageDraw, square_px: int, light: tuple, dark: tuple, font_path: str
+) -> None:
+    """Rank numbers down the a-file and file letters along rank 1, like most chess websites."""
+    font = ImageFont.truetype(font_path, max(8, square_px // 5))
+    for i in range(8):
+        # Each label uses the colour of the *other* square type, so it stays readable.
+        # In column 0 the square of row i is light when i is even; in row 7, column i is dark.
+        rank_color = dark if i % 2 == 0 else light
+        draw.text((2, i * square_px + 1), str(8 - i), font=font, fill=rank_color)
+        file_color = light if i % 2 == 0 else dark
+        position = ((i + 1) * square_px - 2, 8 * square_px - 2)
+        draw.text(position, "abcdefgh"[i], font=font, fill=file_color, anchor="rd")
+
+
 def render_board(
     board: chess.Board,
     square_px: int = 64,
     theme: tuple[tuple[int, int, int], tuple[int, int, int]] = DEFAULT_THEME,
     font_path: str | None = None,
+    *,
+    highlights: tuple[int, ...] = (),
+    coordinates: bool = False,
 ) -> Image.Image:
-    """A top-down picture of ``board`` with White at the bottom, 8 * square_px pixels wide."""
+    """A top-down picture of ``board`` with White at the bottom, 8 * square_px pixels wide.
+
+    ``highlights`` are image-order indices of squares to tint, like a "last move" marker.
+    ``coordinates`` draws the 1-8 and a-h labels on the edge squares.
+    """
     light, dark = theme
-    font = ImageFont.truetype(font_path or find_fonts()[0], int(square_px * 0.85))
+    font_path = font_path or find_fonts()[0]
+    font = ImageFont.truetype(font_path, int(square_px * 0.85))
     image = Image.new("RGB", (8 * square_px, 8 * square_px))
     draw = ImageDraw.Draw(image)
     for index in range(64):
         row, col = divmod(index, 8)
         x0, y0 = col * square_px, row * square_px
         color = light if (row + col) % 2 == 0 else dark
+        if index in highlights:
+            color = tuple((a + b) // 2 for a, b in zip(color, HIGHLIGHT, strict=True))
         draw.rectangle([x0, y0, x0 + square_px - 1, y0 + square_px - 1], fill=color)
+    if coordinates:
+        draw_coordinates(draw, square_px, light, dark, font_path)
+    for index in range(64):
         piece = board.piece_at(square_of_index(index))
         if piece:
-            draw_piece(draw, x0, y0, square_px, piece.symbol(), font)
+            row, col = divmod(index, 8)
+            draw_piece(draw, col * square_px, row * square_px, square_px, piece.symbol(), font)
     return image
