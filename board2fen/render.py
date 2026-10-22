@@ -165,3 +165,24 @@ def render_board(
             draw_piece(draw, col * square_px, row * square_px, square_px, piece.symbol(), font, dx, dy)
 
     return image
+
+
+def jitter_color(color: tuple[int, int, int], rng: random.Random, amount: int = 12) -> tuple[int, int, int]:
+    """``color`` with each channel moved by up to ``amount``, kept inside 0..255."""
+    return tuple(min(255, max(0, c + rng.randint(-amount, amount))) for c in color)
+
+
+def render_random_board(board: chess.Board, rng: random.Random) -> Image.Image:
+    """``board`` drawn in a random style. The same ``rng`` seed always gives the same picture."""
+    light, dark = rng.choice(THEMES)
+    return render_board(
+        board,
+        square_px=rng.randint(32, 96),
+        theme=(jitter_color(light, rng), jitter_color(dark, rng)),
+        font_path=rng.choice(find_fonts()),
+        highlights=tuple(rng.sample(range(64), 2)) if rng.random() < 0.3 else (),
+        coordinates=rng.random() < 0.4,
+        piece_scale=rng.uniform(0.7, 0.95),
+        piece_jitter=rng.uniform(0.0, 0.05),
+        rng=rng,
+    )

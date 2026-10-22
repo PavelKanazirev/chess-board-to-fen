@@ -4,7 +4,14 @@ import chess
 import numpy as np
 import pytest
 
-from board2fen.render import DEFAULT_THEME, HIGHLIGHT, find_fonts, has_chess_glyphs, render_board
+from board2fen.render import (
+    DEFAULT_THEME,
+    HIGHLIGHT,
+    find_fonts,
+    has_chess_glyphs,
+    render_board,
+    render_random_board,
+)
 
 
 def test_at_least_one_font_with_chess_glyphs_is_found():
@@ -82,3 +89,18 @@ def test_jitter_moves_pieces_but_keeps_them_on_their_square():
     assert np.asarray(centred).tolist() != np.asarray(moved).tolist()
     # Even when shifted, the white king is still mostly inside e1.
     assert ink_pixels(square_pixels(moved, 60, 64)) > 0.8 * ink_pixels(square_pixels(centred, 60, 64))
+
+
+def test_random_board_is_reproducible():
+    board = chess.Board()
+    first = render_random_board(board, random.Random(42))
+    again = render_random_board(board, random.Random(42))
+    other = render_random_board(board, random.Random(43))
+    assert first.tobytes() == again.tobytes()
+    assert first.tobytes() != other.tobytes()
+
+
+def test_random_board_sizes_vary_within_limits():
+    sizes = {render_random_board(chess.Board(), random.Random(seed)).size[0] for seed in range(20)}
+    assert len(sizes) > 5
+    assert all(8 * 32 <= size <= 8 * 96 for size in sizes)
