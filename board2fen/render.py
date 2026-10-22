@@ -7,6 +7,7 @@ white with a black outline for White, black for Black.
 
 import functools
 import os
+import random
 from pathlib import Path
 
 import chess
@@ -85,13 +86,23 @@ def find_fonts() -> tuple[str, ...]:
 
 
 def draw_piece(
-    draw: ImageDraw.ImageDraw, x0: int, y0: int, size: int, symbol: str, font: ImageFont.FreeTypeFont
+    draw: ImageDraw.ImageDraw,
+    x0: int,
+    y0: int,
+    size: int,
+    symbol: str,
+    font: ImageFont.FreeTypeFont,
+    dx: float = 0.0,
+    dy: float = 0.0,
 ) -> None:
-    """Draw one piece (``symbol`` like "N" or "q") centred in the square at (x0, y0)."""
+    """Draw one piece (``symbol`` like "N" or "q") centred in the square at (x0, y0).
+
+    ``dx`` and ``dy`` shift it away from the centre, in pixels.
+    """
     glyph = GLYPHS[symbol.lower()]
     left, top, right, bottom = font.getbbox(glyph)  # the ink's box, relative to the text origin
-    x = x0 + size / 2 - (left + right) / 2
-    y = y0 + size / 2 - (top + bottom) / 2
+    x = x0 + size / 2 - (left + right) / 2 + dx
+    y = y0 + size / 2 - (top + bottom) / 2 + dy
     fill = (255, 255, 255) if symbol.isupper() else (0, 0, 0)
     draw.text((x, y), glyph, font=font, fill=fill, stroke_width=max(1, size // 32), stroke_fill=(0, 0, 0))
 
@@ -119,15 +130,21 @@ def render_board(
     *,
     highlights: tuple[int, ...] = (),
     coordinates: bool = False,
+    piece_scale: float = 0.85,
+    piece_jitter: float = 0.0,
+    rng: random.Random | None = None,
 ) -> Image.Image:
     """A top-down picture of ``board`` with White at the bottom, 8 * square_px pixels wide.
 
     ``highlights`` are image-order indices of squares to tint, like a "last move" marker.
     ``coordinates`` draws the 1-8 and a-h labels on the edge squares.
+    ``piece_scale`` is the piece size as a fraction of the square. ``piece_jitter`` moves each
+    piece by up to that fraction of the square in x and y, using ``rng`` for the random numbers.
     """
     light, dark = theme
+    rng = rng or random.Random(0)
     font_path = font_path or find_fonts()[0]
-    font = ImageFont.truetype(font_path, int(square_px * 0.85))
+    font = ImageFont.truetype(font_path, int(square_px * piece_scale))
     image = Image.new("RGB", (8 * square_px, 8 * square_px))
     draw = ImageDraw.Draw(image)
     for index in range(64):
@@ -143,5 +160,8 @@ def render_board(
         piece = board.piece_at(square_of_index(index))
         if piece:
             row, col = divmod(index, 8)
-            draw_piece(draw, col * square_px, row * square_px, square_px, piece.symbol(), font)
+            dx = rng.uniform(-piece_jitter, piece_jitter) * square_px
+            dy = rng.uniform(-piece_jitter, piece_jitter) * square_px
+            draw_piece(draw, col * square_px, row * square_px, square_px, piece.symbol(), font, dx, dy)
+
     return image

@@ -1,3 +1,5 @@
+import random
+
 import chess
 import numpy as np
 import pytest
@@ -59,3 +61,24 @@ def test_coordinates_are_drawn_on_the_edge_squares():
     for index in (0, 56, 63):  # a8 has "8", a1 has "1" and "a", h1 has "h"
         assert (square_pixels(labelled, index, 64) != square_pixels(plain, index, 64)).any()
     assert (square_pixels(labelled, 27, 64) == square_pixels(plain, 27, 64)).all()  # d5: no label
+
+
+def ink_pixels(square):
+    """How many pixels of a square are almost black (the black pieces and outlines)."""
+    return int((square.max(axis=2) < 60).sum())
+
+
+def test_piece_scale_changes_the_piece_size():
+    board = chess.Board("7r/8/8/8/8/8/8/8 w - - 0 1")  # a lone black rook on h8
+    small = render_board(board, square_px=64, piece_scale=0.6)
+    large = render_board(board, square_px=64, piece_scale=0.95)
+    assert ink_pixels(square_pixels(small, 7, 64)) < ink_pixels(square_pixels(large, 7, 64))
+
+
+def test_jitter_moves_pieces_but_keeps_them_on_their_square():
+    board = chess.Board()
+    centred = render_board(board, square_px=64)
+    moved = render_board(board, square_px=64, piece_jitter=0.05, rng=random.Random(1))
+    assert np.asarray(centred).tolist() != np.asarray(moved).tolist()
+    # Even when shifted, the white king is still mostly inside e1.
+    assert ink_pixels(square_pixels(moved, 60, 64)) > 0.8 * ink_pixels(square_pixels(centred, 60, 64))
