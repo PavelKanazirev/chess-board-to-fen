@@ -39,6 +39,16 @@
 git clone https://github.com/PavelKanazirev/chess-board-to-fen.git
 ```
 
+## Development setup
+
+```bash
+python -m venv .venv
+source .venv/Scripts/activate      # Git Bash; in PowerShell: .venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+pytest
+```
+
+
 ## License
 
 [MIT](LICENSE)
