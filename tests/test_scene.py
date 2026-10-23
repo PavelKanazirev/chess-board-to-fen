@@ -6,7 +6,13 @@ import numpy as np
 import pytest
 
 from board2fen.render import render_board
-from board2fen.scene import paste_board, random_background, random_board_corners
+from board2fen.scene import (
+    paste_board,
+    photo_effects,
+    random_background,
+    random_board_corners,
+    render_scene,
+)
 
 
 def test_background_shape_and_type():
@@ -42,3 +48,21 @@ def test_warping_back_with_the_corners_recovers_the_board():
     top_down = np.float32([[0, 0], [256, 0], [256, 256], [0, 256]])
     back = cv2.warpPerspective(scene, cv2.getPerspectiveTransform(corners, top_down), (256, 256))
     assert np.abs(back.astype(int) - board_image.astype(int)).mean() < 10
+
+
+def test_photo_effects_change_the_image_but_not_its_shape():
+    image = np.full((60, 80, 3), 128, np.uint8)
+    out = photo_effects(image, random.Random(0))
+    assert out.shape == image.shape and out.dtype == np.uint8
+    assert not np.array_equal(out, image)
+    assert np.array_equal(out, photo_effects(image, random.Random(0)))  # same seed, same result
+
+
+def test_render_scene_is_reproducible_and_bigger_than_the_board():
+    image, corners = render_scene(chess.Board(), random.Random(5))
+    again, corners_again = render_scene(chess.Board(), random.Random(5))
+    assert np.array_equal(image, again) and np.array_equal(corners, corners_again)
+    height, width = image.shape[:2]
+    assert (corners[:, 0] < width).all() and (corners[:, 1] < height).all()
+    board_width = np.linalg.norm(corners[1] - corners[0])
+    assert board_width < width

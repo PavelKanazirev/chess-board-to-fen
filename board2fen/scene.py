@@ -7,8 +7,11 @@ OpenCV assumes BGR order when it encodes or saves images, so we convert only at 
 import math
 import random
 
+import chess
 import cv2
 import numpy as np
+
+from board2fen.render import render_random_board
 
 
 def numpy_rng(rng: random.Random) -> np.random.Generator:
@@ -67,3 +70,35 @@ def paste_board(background: np.ndarray, board_image: np.ndarray, corners: np.nda
     mask = cv2.warpPerspective(np.full((n, n), 255, np.uint8), matrix, (width, height))
     alpha = mask[..., None].astype(np.float32) / 255  # 1 = board, 0 = background
     return (warped * alpha + background * (1 - alpha)).astype(np.uint8)
+
+
+def photo_effects(image: np.ndarray, rng: random.Random) -> np.ndarray:
+    """Camera imperfections: exposure, uneven light, blur, sensor noise and JPEG compression."""
+    out = image.astype(np.float32)
+    out = out * rng.uniform(0.7, 1.3) + rng.uniform(-40, 40)  # contrast and brightness
+    if rng.random() < 0.5:  # a lamp off to one side: darker further away from it
+        h, w = out.shape[:2]
+        yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+        lamp_x, lamp_y = rng.uniform(0, w), rng.uniform(0, h)
+        distance = np.sqrt((xx - lamp_x) ** 2 + (yy - lamp_y) ** 2) / max(h, w)
+        out *= (1 - rng.uniform(0, 0.5) * distance)[..., None]
+    if rng.random() < 0.4:  # slightly out of focus
+        out = cv2.GaussianBlur(out, (0, 0), rng.uniform(0.5, 1.5))
+    out += numpy_rng(rng).normal(0, rng.uniform(0, 8), out.shape)  # sensor noise
+    out = np.clip(out, 0, 255).astype(np.uint8)
+    quality = rng.randint(35, 95)
+    ok, jpeg = cv2.imencode(".jpg", cv2.cvtColor(out, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, quality])
+    if not ok:
+        raise RuntimeError("JPEG encoding failed")
+    return cv2.cvtColor(cv2.imdecode(jpeg, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
+
+
+def render_scene(board: chess.Board, rng: random.Random) -> tuple[np.ndarray, np.ndarray]:
+    """``board`` as a random "photo". Returns the RGB image and the board corners (a8, h8, h1, a1)."""
+    board_image = np.asarray(render_random_board(board, rng))
+    n = board_image.shape[0]
+    height = rng.randint(int(n * 1.3), int(n * 2.0))
+    width = height + rng.randint(0, height // 3)
+    corners = random_board_corners(width, height, rng)
+    scene = paste_board(random_background(width, height, rng), board_image, corners)
+    return photo_effects(scene, rng), corners
