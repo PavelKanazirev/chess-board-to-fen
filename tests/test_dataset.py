@@ -1,6 +1,6 @@
 import numpy as np
-from board2fen.dataset import EMPTY, scene_squares
 
+from board2fen.dataset import EMPTY, generate, load, save, scene_squares
 from board2fen.labels import NUM_CLASSES
 
 
@@ -24,3 +24,22 @@ def test_keep_empty_controls_the_empty_squares():
     _squares, labels = scene_squares(1, keep_empty=0.0)
     assert EMPTY not in labels
     assert len(labels) == np.count_nonzero(all_labels != EMPTY)
+
+
+def test_generate_gives_the_same_data_with_any_number_of_workers():
+    serial = generate(range(4), workers=1)
+    parallel = generate(range(4), workers=2)
+    assert np.array_equal(serial[0], parallel[0]) and np.array_equal(serial[1], parallel[1])
+
+
+def test_every_class_appears_in_a_small_dataset():
+    _squares, labels = generate(range(20))
+    assert set(labels.tolist()) == set(range(NUM_CLASSES))
+
+
+def test_save_and_load_round_trip(tmp_path):
+    squares, labels = generate(range(2))
+    path = tmp_path / "subfolder" / "squares.npz"
+    save(path, squares, labels)
+    loaded_squares, loaded_labels = load(path)
+    assert np.array_equal(loaded_squares, squares) and np.array_equal(loaded_labels, labels)

@@ -5,6 +5,9 @@ like the output of a slightly imperfect detector while every label stays correct
 """
 
 import random
+from collections.abc import Sequence
+from multiprocessing import Pool
+from pathlib import Path
 
 import numpy as np
 
@@ -35,3 +38,32 @@ def scene_squares(
     labels = np.array(board_to_labels(board), np.uint8)
     keep = np.array([label != EMPTY or rng.random() < keep_empty for label in labels])
     return squares[keep], labels[keep]
+
+
+def generate(seeds: Sequence[int], img_size: int = 32, workers: int = 1) -> tuple[np.ndarray, np.ndarray]:
+    """Squares and labels of many scenes, rendered by ``workers`` processes in parallel.
+
+    The result is the same for any number of workers: ``Pool.starmap`` returns the results in the
+    order of ``seeds``.
+    """
+    jobs = [(seed, img_size) for seed in seeds]
+    if workers > 1:
+        with Pool(workers) as pool:
+            parts = pool.starmap(scene_squares, jobs, chunksize=8)
+    else:
+        parts = [scene_squares(*job) for job in jobs]
+    squares = np.concatenate([part[0] for part in parts])
+    labels = np.concatenate([part[1] for part in parts])
+    return squares, labels
+
+
+def save(path: Path, squares: np.ndarray, labels: np.ndarray) -> None:
+    """Store a dataset as one compressed .npz file (a zip of numpy arrays)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(path, squares=squares, labels=labels)
+
+
+def load(path: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Read a dataset written by ``save``."""
+    with np.load(path) as data:
+        return data["squares"], data["labels"]
