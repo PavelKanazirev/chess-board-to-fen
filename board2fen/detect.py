@@ -55,10 +55,36 @@ def split_squares(board: np.ndarray, img_size: int) -> np.ndarray:
     return board.reshape(8, img_size, 8, img_size).transpose(0, 2, 1, 3).reshape(64, img_size, img_size)
 
 
+def line_intersection(p1: np.ndarray, q1: np.ndarray, p2: np.ndarray, q2: np.ndarray) -> np.ndarray | None:
+    """Where the line through p1, q1 crosses the line through p2, q2 (None if they're parallel)."""
+    d1, d2 = q1 - p1, q2 - p2
+    denom = d1[0] * d2[1] - d1[1] * d2[0]  # 2D cross product: 0 means parallel
+    if abs(denom) < 1e-9:
+        return None
+    t = ((p2[0] - p1[0]) * d2[1] - (p2[1] - p1[1]) * d2[0]) / denom
+    return p1 + t * d1
+
+
 def hull_to_quad(hull: np.ndarray) -> np.ndarray | None:
-    """Simplify a convex hull to its 4 corners, or None if it isn't 4-sided."""
-    approx = cv2.approxPolyDP(hull, 0.02 * cv2.arcLength(hull, True), True)
-    return order_corners(approx) if len(approx) == 4 else None
+    """Turn a convex hull into the board's 4 corners, or None if it isn't roughly 4-sided.
+
+    Where a board corner has little contrast against the background, the hull "cuts the corner"
+    and gets an extra short edge. So instead of trusting the hull's vertices, we take its 4 longest
+    edges (the real board sides) and intersect neighbouring ones.
+    """
+    poly = cv2.approxPolyDP(hull, 0.01 * cv2.arcLength(hull, True), True).reshape(-1, 2).astype(np.float64)
+    if len(poly) < 4:
+        return None
+    edges = [(poly[i], poly[(i + 1) % len(poly)]) for i in range(len(poly))]
+    lengths = np.array([np.linalg.norm(end - start) for start, end in edges])
+    longest = sorted(np.argsort(lengths)[-4:])  # the 4 longest edges, in their order around the hull
+    if lengths[longest].sum() < 0.6 * lengths.sum():
+        return None  # the outline is too ragged to be a quadrilateral
+    sides = [edges[i] for i in longest]
+    corners = [line_intersection(*sides[i - 1], *sides[i]) for i in range(4)]
+    if any(corner is None for corner in corners):
+        return None
+    return order_corners(corners)
 
 
 def largest_quad(edges: np.ndarray, min_area: float) -> np.ndarray | None:

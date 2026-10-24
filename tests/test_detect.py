@@ -9,6 +9,7 @@ import pytest
 from board2fen.detect import (
     corner_error,
     detect_board,
+    line_intersection,
     order_corners,
     split_squares,
     to_gray,
@@ -110,3 +111,24 @@ def test_corner_error_is_relative_to_the_board_size():
     moved = truth.copy()
     moved[2] += [6, 8]  # one corner off by 10 pixels (a 6-8-10 triangle)
     assert corner_error(moved, truth) == pytest.approx(0.10)
+
+
+def test_line_intersection():
+    horizontal = (np.array([0.0, 0.0]), np.array([1.0, 0.0]))  # the line y = 0
+    vertical = (np.array([5.0, -1.0]), np.array([5.0, 1.0]))  # the line x = 5
+    assert line_intersection(*horizontal, *vertical).tolist() == [5.0, 0.0]
+
+
+def test_parallel_lines_do_not_intersect():
+    a, b = np.array([0.0, 0.0]), np.array([1.0, 1.0])
+    assert line_intersection(a, b, a + [0, 5], b + [0, 5]) is None
+
+
+def test_detect_board_on_random_scenes():
+    good = 0
+    for seed in range(30):
+        rng = random.Random(seed)
+        image, truth = render_scene(random_position(rng), rng)
+        found = detect_board(image)
+        good += found is not None and corner_error(found, truth) < 0.03
+    assert good >= 26
