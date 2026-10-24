@@ -6,7 +6,14 @@ import cv2
 import numpy as np
 import pytest
 
-from board2fen.detect import detect_board, order_corners, split_squares, to_gray, warp_board
+from board2fen.detect import (
+    corner_error,
+    detect_board,
+    order_corners,
+    split_squares,
+    to_gray,
+    warp_board,
+)
 from board2fen.labels import board_to_labels
 from board2fen.positions import random_position
 from board2fen.render import render_board
@@ -95,3 +102,11 @@ def test_detect_board_ignores_small_squares():
     image = np.full((400, 400, 3), 200, np.uint8)
     cv2.rectangle(image, (10, 10), (60, 60), (0, 0, 0), thickness=-1)  # about 2% of the picture
     assert detect_board(image) is None
+
+
+def test_corner_error_is_relative_to_the_board_size():
+    truth = np.float32([[0, 0], [100, 0], [100, 100], [0, 100]])
+    assert corner_error(truth, truth) == 0
+    moved = truth.copy()
+    moved[2] += [6, 8]  # one corner off by 10 pixels (a 6-8-10 triangle)
+    assert corner_error(moved, truth) == pytest.approx(0.10)

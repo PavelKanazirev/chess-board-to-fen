@@ -94,3 +94,9 @@ def detect_board(image: np.ndarray, min_area_frac: float = 0.15) -> np.ndarray |
     edges = cv2.dilate(cv2.Canny(blurred, 40, 120), np.ones((3, 3), np.uint8))
     quad = largest_quad(edges, min_area_frac * gray.size)
     return None if quad is None else quad / scale
+
+
+def corner_error(found: np.ndarray, truth: np.ndarray) -> float:
+    """The worst corner distance, as a fraction of the board's top edge (0.01 = 1%)."""
+    side = float(np.linalg.norm(truth[1] - truth[0]))
+    return float(np.linalg.norm(np.asarray(found) - truth, axis=1).max()) / side
