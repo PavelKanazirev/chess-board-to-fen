@@ -2,10 +2,11 @@ import itertools
 import random
 
 import chess
+import cv2
 import numpy as np
 import pytest
 
-from board2fen.detect import order_corners, split_squares, to_gray, warp_board
+from board2fen.detect import detect_board, order_corners, split_squares, to_gray, warp_board
 from board2fen.labels import board_to_labels
 from board2fen.positions import random_position
 from board2fen.render import render_board
@@ -69,3 +70,28 @@ def test_squares_from_a_scene_match_the_labels():
     labels = np.array(board_to_labels(board))
     contrast = squares.reshape(64, -1).std(axis=1)  # a piece adds dark and light pixels
     assert contrast[labels != 0].mean() > 2 * contrast[labels == 0].mean()
+
+
+def clear_scene():
+    """The start position, slightly tilted, on a plain dark background."""
+    board_image = np.asarray(render_board(chess.Board(), square_px=40))  # 320 x 320
+    corners = np.float32([[110, 70], [430, 90], [420, 400], [90, 390]])
+    scene = paste_board(np.full((480, 520, 3), 60, np.uint8), board_image, corners)
+    return scene, corners
+
+
+def test_detect_board_finds_a_clear_board():
+    scene, corners = clear_scene()
+    found = detect_board(scene)
+    assert found is not None
+    assert np.abs(found - corners).max() < 0.03 * 320  # every corner within 3% of the board size
+
+
+def test_detect_board_returns_none_without_a_board():
+    assert detect_board(np.full((300, 400, 3), 128, np.uint8)) is None
+
+
+def test_detect_board_ignores_small_squares():
+    image = np.full((400, 400, 3), 200, np.uint8)
+    cv2.rectangle(image, (10, 10), (60, 60), (0, 0, 0), thickness=-1)  # about 2% of the picture
+    assert detect_board(image) is None

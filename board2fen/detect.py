@@ -53,3 +53,44 @@ def split_squares(board: np.ndarray, img_size: int) -> np.ndarray:
         raise ValueError(f"expected a board of shape {expected}, got {board.shape}")
     # (rows of squares, pixel row, columns of squares, pixel column) -> squares first, then pixels
     return board.reshape(8, img_size, 8, img_size).transpose(0, 2, 1, 3).reshape(64, img_size, img_size)
+
+
+def hull_to_quad(hull: np.ndarray) -> np.ndarray | None:
+    """Simplify a convex hull to its 4 corners, or None if it isn't 4-sided."""
+    approx = cv2.approxPolyDP(hull, 0.02 * cv2.arcLength(hull, True), True)
+    return order_corners(approx) if len(approx) == 4 else None
+
+
+def largest_quad(edges: np.ndarray, min_area: float) -> np.ndarray | None:
+    """The biggest roughly square quadrilateral outlined by the edge pixels, or None."""
+    contours, _hierarchy = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    best, best_area = None, 0.0
+    for contour in contours:
+        hull = cv2.convexHull(contour)
+        area = cv2.contourArea(hull)
+        if area < min_area or area <= best_area:
+            continue
+        quad = hull_to_quad(hull)
+        if quad is None:
+            continue
+        sides = np.linalg.norm(quad - np.roll(quad, 1, axis=0), axis=1)
+        if sides.min() < 0.5 * sides.max():  # far too stretched to be a chessboard
+            continue
+        best, best_area = quad, area
+    return best
+
+
+def detect_board(image: np.ndarray, min_area_frac: float = 0.15) -> np.ndarray | None:
+    """Find the board's 4 corners (a8, h8, h1, a1) in a photo, or None if no board is visible.
+
+    The board is taken to be the largest roughly square outline in the picture's edges.
+    ``min_area_frac`` ignores outlines covering less than that fraction of the picture.
+    """
+    gray = to_gray(image)
+    scale = min(1.0, 800.0 / max(gray.shape))  # work on a copy at most 800 pixels wide
+    if scale < 1.0:
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    edges = cv2.dilate(cv2.Canny(blurred, 40, 120), np.ones((3, 3), np.uint8))
+    quad = largest_quad(edges, min_area_frac * gray.size)
+    return None if quad is None else quad / scale
