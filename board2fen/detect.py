@@ -41,3 +41,15 @@ def warp_board(image: np.ndarray, corners: np.ndarray, img_size: int = 32, overs
         to_gray(image), matrix, (n, n), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE
     )
     return cv2.resize(big, (8 * img_size, 8 * img_size), interpolation=cv2.INTER_AREA)
+
+
+def split_squares(board: np.ndarray, img_size: int) -> np.ndarray:
+    """Cut a straightened (8 * img_size)² board into 64 squares, in image order (a8, b8, ..., h1).
+
+    Returns an array of shape (64, img_size, img_size).
+    """
+    expected = (8 * img_size, 8 * img_size)
+    if board.shape != expected:
+        raise ValueError(f"expected a board of shape {expected}, got {board.shape}")
+    # (rows of squares, pixel row, columns of squares, pixel column) -> squares first, then pixels
+    return board.reshape(8, img_size, 8, img_size).transpose(0, 2, 1, 3).reshape(64, img_size, img_size)
