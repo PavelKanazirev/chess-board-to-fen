@@ -132,3 +132,13 @@ def test_detect_board_on_random_scenes():
         found = detect_board(image)
         good += found is not None and corner_error(found, truth) < 0.03
     assert good >= 26
+
+
+def test_detect_board_finds_a_low_contrast_board():
+    faint = ((130, 130, 130), (110, 110, 110))  # light and dark squares only 20 grey levels apart
+    board_image = np.asarray(render_board(chess.Board(None), square_px=40, theme=faint))
+    corners = np.float32([[110, 70], [430, 90], [420, 400], [90, 390]])
+    background = np.full((480, 520, 3), 110, np.uint8)  # the same grey as the dark squares
+    found = detect_board(paste_board(background, board_image, corners))
+    assert found is not None
+    assert corner_error(found, corners) < 0.03

@@ -117,9 +117,14 @@ def detect_board(image: np.ndarray, min_area_frac: float = 0.15) -> np.ndarray |
     if scale < 1.0:
         gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    edges = cv2.dilate(cv2.Canny(blurred, 40, 120), np.ones((3, 3), np.uint8))
-    quad = largest_quad(edges, min_area_frac * gray.size)
-    return None if quad is None else quad / scale
+    # First with normal edges. If that finds no board, try again with more sensitive edges and
+    # thicker lines, which join up the broken outline of a low-contrast board.
+    for low, high, thickening in ((40, 120, 1), (15, 45, 3)):
+        edges = cv2.dilate(cv2.Canny(blurred, low, high), np.ones((3, 3), np.uint8), iterations=thickening)
+        quad = largest_quad(edges, min_area_frac * gray.size)
+        if quad is not None:
+            return quad / scale
+    return None
 
 
 def corner_error(found: np.ndarray, truth: np.ndarray) -> float:
