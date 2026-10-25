@@ -19,7 +19,7 @@ jobs:
       - name: Install fonts with chess glyphs
         run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-dejavu-core
       - name: Install
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,train]"
       - name: Lint (ruff)
         run: ruff check .
       - name: Format check (ruff)
@@ -28,4 +28,3 @@ jobs:
         run: pytest
       - name: Dataset script smoke test
         run: python scripts/generate_dataset.py --boards 8 --val-boards 4 --out-dir /tmp/smoke
-
