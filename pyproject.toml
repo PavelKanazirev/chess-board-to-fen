@@ -35,3 +35,7 @@ select = ["E", "F", "W", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+filterwarnings = [
+    # TensorFlow's autograph uses an old API of its dependency "gast"; not our code.
+    "ignore::DeprecationWarning:gast.*",
+]
