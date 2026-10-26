@@ -20,6 +20,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=9.0", "ruff>=0.17"]
+train = ["tensorflow>=2.20"]
 
 [tool.setuptools.packages.find]
 include = ["board2fen*"]
@@ -34,3 +35,7 @@ select = ["E", "F", "W", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+filterwarnings = [
+    # TensorFlow's autograph uses an old API of its dependency "gast"; not our code.
+    "ignore::DeprecationWarning:gast.*",
+]

@@ -15,5 +15,8 @@ data/
 build/
 out/
 
+# Throwaway models from smoke runs (the real model in models/ is committed)
+models/smoke*
+
 # Local debug output
 debug*.png
