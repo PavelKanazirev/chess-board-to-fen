@@ -5,9 +5,9 @@ import chess
 import cv2
 import numpy as np
 import pytest
-from board2fen.pipeline import load_image, recognize
 
 from board2fen.infer import load_classifier
+from board2fen.pipeline import load_image, recognize
 from board2fen.positions import random_position
 from board2fen.render import render_board
 from board2fen.scene import render_scene

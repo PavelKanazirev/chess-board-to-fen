@@ -2,8 +2,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from board2fen.infer import load_classifier
 
+from board2fen.infer import load_classifier
 from board2fen.labels import NUM_CLASSES
 
 MODEL = Path(__file__).resolve().parent.parent / "models" / "square_classifier.keras"
