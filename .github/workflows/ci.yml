@@ -30,3 +30,5 @@ jobs:
         run: python scripts/generate_dataset.py --boards 8 --val-boards 4 --out-dir /tmp/smoke
       - name: Training script smoke test
         run: python scripts/train.py --epochs 1 --train /tmp/smoke/train.npz --val /tmp/smoke/val.npz --out /tmp/smoke/model.keras
+      - name: Evaluation script smoke test
+        run: python scripts/evaluate_model.py --test-boards 5 --scenes 3 --out-dir /tmp/evaluation
