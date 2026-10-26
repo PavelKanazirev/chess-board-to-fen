@@ -3,10 +3,9 @@ import pytest
 
 keras = pytest.importorskip("keras")  # skip these tests if the "train" extra isn't installed
 
-from board2fen.model import build_model, compile_model  # noqa: E402
-
 from board2fen.dataset import generate  # noqa: E402
 from board2fen.labels import NUM_CLASSES  # noqa: E402
+from board2fen.model import build_model, compile_model  # noqa: E402
 
 
 def test_output_is_a_probability_per_class():
