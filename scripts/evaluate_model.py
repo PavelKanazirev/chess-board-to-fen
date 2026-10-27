@@ -14,11 +14,9 @@ import random
 from pathlib import Path
 
 import cv2
-import keras
 import numpy as np
 
 from board2fen.dataset import generate, load
-from board2fen.detect import detect_board, split_squares, warp_board
 from board2fen.evaluation import (
     confusion_matrix,
     error_gallery,
@@ -26,7 +24,9 @@ from board2fen.evaluation import (
     per_class_accuracy,
     top_confusions,
 )
+from board2fen.infer import SquareClassifier, load_classifier
 from board2fen.labels import CLASSES, board_to_labels
+from board2fen.pipeline import recognize
 from board2fen.positions import random_position
 from board2fen.scene import render_scene
 
@@ -34,14 +34,16 @@ TEST_SEED_OFFSET = 2_000_000
 SCENE_SEED_OFFSET = 3_000_000
 
 
-def predict(model: keras.Model, squares: np.ndarray) -> np.ndarray:
-    """The predicted class of every square."""
-    probabilities = model.predict(squares[..., None].astype(np.float32), batch_size=1024, verbose=0)
-    return probabilities.argmax(axis=1)
+def predict(classifier: SquareClassifier, squares: np.ndarray) -> np.ndarray:
+    """The predicted class of every square, computed in batches of 1024."""
+    batches = [classifier.predict(squares[start : start + 1024]) for start in range(0, len(squares), 1024)]
+    return np.concatenate(batches).argmax(axis=1)
 
 
-def evaluate_squares(model: keras.Model, squares: np.ndarray, labels: np.ndarray, out_dir: Path) -> None:
-    predicted = predict(model, squares)
+def evaluate_squares(
+    classifier: SquareClassifier, squares: np.ndarray, labels: np.ndarray, out_dir: Path
+) -> None:
+    predicted = predict(classifier, squares)
     matrix = confusion_matrix(labels, predicted)
     mistakes = int((predicted != labels).sum())
     print(f"squares: {len(labels)}   accuracy: {(predicted == labels).mean():.4%}   mistakes: {mistakes}")
@@ -56,20 +58,18 @@ def evaluate_squares(model: keras.Model, squares: np.ndarray, labels: np.ndarray
         print(f"pictures of the mistakes -> {out_dir / 'errors.png'}")
 
 
-def evaluate_scenes(model: keras.Model, count: int) -> None:
+def evaluate_scenes(classifier: SquareClassifier, count: int) -> None:
     """The whole pipeline on rendered photos: detect the board, cut 64 squares, classify them."""
-    img_size = model.input_shape[1]
     found = right_squares = perfect_boards = 0
     for seed in range(SCENE_SEED_OFFSET, SCENE_SEED_OFFSET + count):
         rng = random.Random(seed)
         board = random_position(rng)
         image, _true_corners = render_scene(board, rng)
-        corners = detect_board(image)
-        if corners is None:
+        result = recognize(image, classifier)
+        if not result.detected:
             continue  # all 64 squares count as wrong
         found += 1
-        squares = split_squares(warp_board(image, corners, img_size), img_size)
-        right = int((predict(model, squares) == np.array(board_to_labels(board))).sum())
+        right = int((result.labels == np.array(board_to_labels(board))).sum())
         right_squares += right
         perfect_boards += right == 64
     print(
@@ -89,15 +89,15 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, default=Path("data/evaluation"))
     args = parser.parse_args()
 
-    model = keras.models.load_model(args.model)
+    classifier = load_classifier(args.model)
     if args.npz:
         squares, labels = load(args.npz)
     else:
         seeds = range(TEST_SEED_OFFSET, TEST_SEED_OFFSET + args.test_boards)
-        squares, labels = generate(seeds, model.input_shape[1], workers=4)
-    evaluate_squares(model, squares, labels, args.out_dir)
+        squares, labels = generate(seeds, classifier.img_size, workers=4)
+    evaluate_squares(classifier, squares, labels, args.out_dir)
     if args.scenes:
-        evaluate_scenes(model, args.scenes)
+        evaluate_scenes(classifier, args.scenes)
 
 
 if __name__ == "__main__":
