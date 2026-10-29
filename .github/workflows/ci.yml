@@ -19,7 +19,7 @@ jobs:
       - name: Install fonts with chess glyphs
         run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-dejavu-core
       - name: Install
-        run: pip install -e ".[dev,train]"
+        run: pip install -e ".[dev,train,tflite]"
       - name: Lint (ruff)
         run: ruff check .
       - name: Format check (ruff)

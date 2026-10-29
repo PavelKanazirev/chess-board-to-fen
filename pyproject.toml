@@ -21,6 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=9.0", "ruff>=0.17"]
 train = ["tensorflow>=2.20"]
+tflite = ["ai-edge-litert>=2.3"]
 
 [tool.setuptools.packages.find]
 include = ["board2fen*"]
