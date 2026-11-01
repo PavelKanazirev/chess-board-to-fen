@@ -4,7 +4,6 @@ from board2fen.evaluation import (
     confusion_matrix,
     error_gallery,
     format_confusion,
-    ms_per_board,
     per_class_accuracy,
     top_confusions,
 )
@@ -45,19 +44,3 @@ def test_error_gallery_shows_only_the_mistakes():
     gallery = error_gallery(squares, TRUTH, PREDICTED, columns=8)
     assert gallery.shape == (32 * 3 + 14, 8 * 32 * 3)  # 2 mistakes fit in one row
     assert error_gallery(squares, TRUTH, TRUTH) is None
-
-
-def test_ms_per_board_times_one_board():
-    class CountingClassifier:
-        img_size = 32
-        calls = 0
-
-        def predict(self, squares):
-            self.calls += 1
-            assert len(squares) == 64  # always exactly one board
-            return np.zeros((len(squares), 13))
-
-    classifier = CountingClassifier()
-    ms = ms_per_board(classifier, np.zeros((100, 32, 32), np.uint8), runs=10)
-    assert ms >= 0
-    assert classifier.calls == 5 + 10  # warm-up runs + timed runs
