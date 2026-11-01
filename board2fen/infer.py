@@ -34,9 +34,46 @@ class KerasClassifier(SquareClassifier):
         return np.asarray(self.model(x, training=False))
 
 
+class TFLiteClassifier(SquareClassifier):
+    """Runs a ``.tflite`` model with LiteRT, the TensorFlow Lite runtime. No TensorFlow needed."""
+
+    def __init__(self, path: Path, num_threads: int | None = None):
+        from ai_edge_litert.interpreter import Interpreter  # the small runtime package
+
+        self.interpreter = Interpreter(model_path=str(path), num_threads=num_threads)
+        self.interpreter.allocate_tensors()
+        self.input = self.interpreter.get_input_details()[0]
+        self.output = self.interpreter.get_output_details()[0]
+        self.img_size = int(self.input["shape"][1])
+        self.batch_size = int(self.input["shape"][0])
+
+    def predict(self, squares: np.ndarray) -> np.ndarray:
+        if len(squares) != self.batch_size:  # the file is exported for a batch of 1
+            shape = [len(squares), self.img_size, self.img_size, 1]
+            self.interpreter.resize_tensor_input(self.input["index"], shape)
+            self.interpreter.allocate_tensors()
+            self.batch_size = len(squares)
+        x = squares[..., None]
+        if self.input["dtype"] == np.float32:
+            x = x.astype(np.float32)
+        else:  # quantized input: stored value = real value / scale + zero_point
+            scale, zero_point = self.input["quantization"]
+            limits = np.iinfo(self.input["dtype"])
+            x = np.clip(np.round(x / scale + zero_point), limits.min, limits.max).astype(self.input["dtype"])
+        self.interpreter.set_tensor(self.input["index"], x)
+        self.interpreter.invoke()
+        y = self.interpreter.get_tensor(self.output["index"])
+        if self.output["dtype"] != np.float32:  # quantized output: back to real probabilities
+            scale, zero_point = self.output["quantization"]
+            y = (y.astype(np.float32) - zero_point) * scale
+        return y
+
+
 def load_classifier(path: str | Path) -> SquareClassifier:
     """Load a model file, choosing the backend from its extension."""
     path = Path(path)
     if path.suffix == ".keras":
         return KerasClassifier(path)
-    raise ValueError(f"unsupported model format {path.suffix!r} (expected .keras)")
+    if path.suffix == ".tflite":
+        return TFLiteClassifier(path)
+    raise ValueError(f"unsupported model format {path.suffix!r} (expected .keras or .tflite)")
