@@ -42,3 +42,24 @@ def export_tflite(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(converter.convert())
     return path
+
+
+def export_onnx(model, path: Path, opset: int = 17) -> Path:
+    """Write a Keras ``model`` as an ONNX file (32-bit floats).
+
+    The input keeps a variable batch size, so one call can classify all 64 squares of a board.
+    ``opset`` is the version of the ONNX operator set; 17 is supported by every current runtime.
+    """
+    import tensorflow as tf  # only needed to convert
+    import tf2onnx
+
+    img_size = model.input_shape[1]
+    signature = (tf.TensorSpec((None, img_size, img_size, 1), tf.float32, name="square"),)
+
+    @tf.function(input_signature=signature)
+    def classify(square):
+        return {"probabilities": model(square, training=False)}
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tf2onnx.convert.from_function(classify, input_signature=signature, opset=opset, output_path=str(path))
+    return path
