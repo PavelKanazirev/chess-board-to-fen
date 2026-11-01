@@ -9,30 +9,16 @@ agrees with the Keras model, and the time for one board (64 squares) on one CPU 
 """
 
 import argparse
-import time
 from pathlib import Path
 
 import keras
-import numpy as np
 
 from board2fen.dataset import generate
+from board2fen.evaluation import ms_per_board
 from board2fen.export import QUANTIZATIONS, export_tflite
-from board2fen.infer import KerasClassifier, SquareClassifier, TFLiteClassifier
+from board2fen.infer import KerasClassifier, TFLiteClassifier
 
 TEST_SEED_OFFSET = 2_000_000
-
-
-def ms_per_board(classifier: SquareClassifier, squares: np.ndarray, runs: int = 50) -> float:
-    """Median time to classify one board (64 squares), after a few warm-up runs."""
-    board = squares[:64]
-    for _ in range(5):
-        classifier.predict(board)
-    times = []
-    for _ in range(runs):
-        start = time.perf_counter()
-        classifier.predict(board)
-        times.append((time.perf_counter() - start) * 1000)
-    return float(np.median(times))
 
 
 def main() -> None:
