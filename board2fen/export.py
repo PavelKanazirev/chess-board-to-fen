@@ -1,11 +1,8 @@
 """Converting the trained Keras model into files for edge devices."""
 
-import time
 from pathlib import Path
 
 import numpy as np
-
-from board2fen.infer import SquareClassifier
 
 QUANTIZATIONS = ("fp32", "fp16", "int8")
 
@@ -103,16 +100,3 @@ def quantize_onnx(fp32_path: Path, path: Path, calibration: np.ndarray) -> Path:
         reduce_range=True,
     )
     return path
-
-
-def ms_per_board(classifier: SquareClassifier, squares: np.ndarray, runs: int = 50) -> float:
-    """Median time to classify one board (64 squares), after a few warm-up runs."""
-    board = squares[:64]
-    for _ in range(5):
-        classifier.predict(board)
-    times = []
-    for _ in range(runs):
-        start = time.perf_counter()
-        classifier.predict(board)
-        times.append((time.perf_counter() - start) * 1000)
-    return float(np.median(times))

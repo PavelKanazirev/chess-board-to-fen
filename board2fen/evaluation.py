@@ -4,9 +4,12 @@ Plain numpy and OpenCV, no TensorFlow: these functions work with predictions fro
 (Keras today, TensorFlow Lite and ONNX Runtime later).
 """
 
+import time
+
 import cv2
 import numpy as np
 
+from board2fen.infer import SquareClassifier
 from board2fen.labels import CLASSES
 
 
@@ -74,3 +77,16 @@ def error_gallery(
         text = f"{CLASSES[truth[index]]}>{CLASSES[predicted[index]]}"
         cv2.putText(gallery, text, (x + 2, y + zoom + 11), cv2.FONT_HERSHEY_SIMPLEX, 0.35, 0, 1, cv2.LINE_AA)
     return gallery
+
+
+def ms_per_board(classifier: SquareClassifier, squares: np.ndarray, runs: int = 50) -> float:
+    """Median time to classify one board (64 squares), after a few warm-up runs."""
+    board = squares[:64]
+    for _ in range(5):
+        classifier.predict(board)
+    times = []
+    for _ in range(runs):
+        start = time.perf_counter()
+        classifier.predict(board)
+        times.append((time.perf_counter() - start) * 1000)
+    return float(np.median(times))
