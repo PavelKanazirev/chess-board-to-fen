@@ -69,6 +69,24 @@ class TFLiteClassifier(SquareClassifier):
         return y
 
 
+class OnnxClassifier(SquareClassifier):
+    """Runs a ``.onnx`` model with ONNX Runtime. No TensorFlow needed."""
+
+    def __init__(self, path: Path, num_threads: int | None = None):
+        import onnxruntime as ort  # the runtime package
+
+        options = ort.SessionOptions()
+        if num_threads:
+            options.intra_op_num_threads = num_threads
+        self.session = ort.InferenceSession(str(path), options, providers=["CPUExecutionProvider"])
+        self.input_name = self.session.get_inputs()[0].name
+        self.img_size = int(self.session.get_inputs()[0].shape[1])
+
+    def predict(self, squares: np.ndarray) -> np.ndarray:
+        x = squares[..., None].astype(np.float32)
+        return self.session.run(None, {self.input_name: x})[0]
+
+
 def load_classifier(path: str | Path) -> SquareClassifier:
     """Load a model file, choosing the backend from its extension."""
     path = Path(path)
@@ -76,4 +94,7 @@ def load_classifier(path: str | Path) -> SquareClassifier:
         return KerasClassifier(path)
     if path.suffix == ".tflite":
         return TFLiteClassifier(path)
-    raise ValueError(f"unsupported model format {path.suffix!r} (expected .keras or .tflite)")
+    if path.suffix == ".onnx":
+        return OnnxClassifier(path)
+
+    raise ValueError(f"unsupported model format {path.suffix!r} (expected .keras, .tflite or .onnx)")

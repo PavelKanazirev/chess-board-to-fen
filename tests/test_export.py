@@ -7,7 +7,10 @@ keras = pytest.importorskip("keras")  # converting needs TensorFlow ("train" ext
 pytest.importorskip("ai_edge_litert")  # running needs LiteRT ("tflite" extra)
 
 from board2fen.dataset import generate  # noqa: E402
-from board2fen.export import export_tflite  # noqa: E402
+from board2fen.export import (  # noqa: E402
+    export_tflite,
+    ms_per_board,
+)
 from board2fen.infer import load_classifier  # noqa: E402
 from board2fen.model import build_model  # noqa: E402
 
@@ -69,3 +72,19 @@ def test_int8_model_agrees_with_the_trained_keras_model(tmp_path):
     keras_classes = np.asarray(keras_probabilities).argmax(axis=1)
     int8_classes = int8.predict(test_squares).argmax(axis=1)
     assert (int8_classes == keras_classes).mean() > 0.98
+
+
+def test_ms_per_board_times_one_board():
+    class CountingClassifier:
+        img_size = 32
+        calls = 0
+
+        def predict(self, squares):
+            self.calls += 1
+            assert len(squares) == 64  # always exactly one board
+            return np.zeros((len(squares), 13))
+
+    classifier = CountingClassifier()
+    ms = ms_per_board(classifier, np.zeros((100, 32, 32), np.uint8), runs=10)
+    assert ms >= 0
+    assert classifier.calls == 5 + 10  # warm-up runs + timed runs
