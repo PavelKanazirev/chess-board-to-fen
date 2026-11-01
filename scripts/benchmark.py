@@ -12,7 +12,7 @@ import platform
 from pathlib import Path
 
 from board2fen.dataset import generate
-from board2fen.export import ms_per_board
+from board2fen.evaluation import ms_per_board
 from board2fen.infer import KerasClassifier, OnnxClassifier, SquareClassifier, TFLiteClassifier
 
 TEST_SEED_OFFSET = 2_000_000

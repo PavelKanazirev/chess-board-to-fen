@@ -7,10 +7,8 @@ keras = pytest.importorskip("keras")  # converting needs TensorFlow ("train" ext
 pytest.importorskip("ai_edge_litert")  # running needs LiteRT ("tflite" extra)
 
 from board2fen.dataset import generate  # noqa: E402
-from board2fen.export import (  # noqa: E402
-    export_tflite,
-    ms_per_board,
-)
+from board2fen.evaluation import ms_per_board  # noqa: E402
+from board2fen.export import export_tflite  # noqa: E402
 from board2fen.infer import load_classifier  # noqa: E402
 from board2fen.model import build_model  # noqa: E402
 
