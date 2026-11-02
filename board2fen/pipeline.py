@@ -19,6 +19,7 @@ class Recognition:
     labels: np.ndarray  # (64,) class index per square, in image order
     confidences: np.ndarray  # (64,) probability of the chosen class
     corners: np.ndarray  # (4, 2) board corners that were used
+    board: np.ndarray  # the straightened grayscale board, (8 * img_size, 8 * img_size)
     detected: bool  # False: no board was found, the whole picture was used
 
 
@@ -37,10 +38,12 @@ def recognize(
     """
     height, width = image.shape[:2]
     corners = detect_board(image) if detect else None
+
     detected = corners is not None
     if corners is None:
         corners = np.float32([[0, 0], [width, 0], [width, height], [0, height]])
-    squares = split_squares(warp_board(image, corners, classifier.img_size), classifier.img_size)
+    board = warp_board(image, corners, classifier.img_size)
+    squares = split_squares(board, classifier.img_size)
     probabilities = classifier.predict(squares)
     labels = probabilities.argmax(axis=1)
     return Recognition(
@@ -48,6 +51,7 @@ def recognize(
         labels=labels,
         confidences=probabilities.max(axis=1),
         corners=corners,
+        board=board,
         detected=detected,
     )
 
@@ -59,3 +63,17 @@ def load_image(path: str | Path) -> np.ndarray:
     if image is None:
         raise ValueError(f"not an image file: {path}")
     return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # OpenCV loads BGR; we use RGB everywhere
+
+
+def save_pgm(path: str | Path, gray: np.ndarray) -> Path:
+    """Write a grayscale image as a binary PGM file: a short text header, then one byte per pixel.
+
+    PGM is about the simplest image format there is, so the C++ demo can read it without an image
+    library, as a program on a small device that gets its frames from a camera driver would.
+    """
+    if gray.ndim != 2 or gray.dtype != np.uint8:
+        raise ValueError(f"expected a 2-D uint8 image, got {gray.dtype} of shape {gray.shape}")
+    height, width = gray.shape
+    path = Path(path)
+    path.write_bytes(f"P5\n{width} {height}\n255\n".encode("ascii") + gray.tobytes())
+    return path

@@ -49,6 +49,20 @@ pytest
 ```
 
 
+## C++ demo (ONNX Runtime)
+
+[`cpp/`](cpp) is a small C++17 program that recognises a straightened board with the ONNX Runtime C++ API: no Python, TensorFlow or OpenCV, as on an embedded device whose camera pipeline already delivers a straightened grayscale frame. CMake downloads the prebuilt ONNX Runtime package once.
+
+```bash
+python scripts/predict.py photo.jpg --model models/square_classifier_int8.onnx --save-board board.pgm
+cmake -S cpp -B build
+cmake --build build --config Release
+build/Release/board2fen_cpp models/square_classifier_int8.onnx board.pgm   # Linux: build/board2fen_cpp
+```
+
+On a 64-bit ARM Linux board (e.g. a Raspberry Pi) the same commands download the aarch64 package. When cross-compiling, point CMake at an extracted package instead: `-DONNXRUNTIME_ROOT=/path/to/onnxruntime-linux-aarch64-1.31.1`.
+
+
 ## License
 
 [MIT](LICENSE)

@@ -39,3 +39,26 @@ jobs:
           python scripts/export_onnx.py --calibration-boards 2 --out-dir /tmp/onnx
           python scripts/benchmark.py --test-boards 2
 
+  cpp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install fonts with chess glyphs
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-dejavu-core
+      - name: Install (ONNX Runtime only, no TensorFlow)
+        run: pip install -e ".[onnxruntime]"
+      - name: Build the C++ demo
+        run: |
+          cmake -S cpp -B build
+          cmake --build build
+      - name: The C++ demo finds the same position as Python
+        run: |
+          python scripts/predict.py --render 3000000 --model models/square_classifier_int8.onnx --save-board /tmp/board.pgm | tee python.txt
+          ./build/board2fen_cpp models/square_classifier_int8.onnx /tmp/board.pgm | tee cpp.txt
+          grep -F "expected $(head -1 cpp.txt | cut -d' ' -f1): correct" python.txt
