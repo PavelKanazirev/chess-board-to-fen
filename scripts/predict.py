@@ -5,6 +5,8 @@ Usage:
     python scripts/predict.py screenshot.png --no-detect      # the picture is just the board
     python scripts/predict.py photo.jpg --flip --black        # seen from Black's side, Black to move
     python scripts/predict.py --render 42                     # try it on a rendered test photo
+    python scripts/predict.py photo.jpg --save-board board.pgm  # input for the C++ demo
+
 """
 
 import argparse
@@ -17,7 +19,7 @@ import cv2
 
 from board2fen.infer import load_classifier
 from board2fen.labels import lichess_analysis_url, square_of_index
-from board2fen.pipeline import load_image, recognize
+from board2fen.pipeline import load_image, recognize, save_pgm
 from board2fen.positions import random_position
 from board2fen.scene import render_scene
 
@@ -31,6 +33,7 @@ def main() -> None:
     parser.add_argument("--model", type=Path, default=Path("models/square_classifier.keras"))
     parser.add_argument("--no-detect", action="store_true", help="the picture shows only the board")
     parser.add_argument("--flip", action="store_true", help="the picture is taken from Black's side")
+    parser.add_argument("--save-board", type=Path, help="save the straightened board as a PGM file")
     parser.add_argument("--black", action="store_true", help="Black to move")
     args = parser.parse_args()
     if (args.image is None) == (args.render is None):
@@ -66,6 +69,8 @@ def main() -> None:
     ]
     if unsure:
         print("not sure about:", " ".join(unsure))
+    if args.save_board:
+        print(f"straightened board -> {save_pgm(args.save_board, result.board)}")
     if expected is not None:
         verdict = "correct" if result.fen.split()[0] == expected else "WRONG"
         print(f"expected {expected}: {verdict}")

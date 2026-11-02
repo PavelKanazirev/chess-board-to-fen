@@ -6,8 +6,9 @@ import cv2
 import numpy as np
 import pytest
 
+from board2fen.detect import split_squares
 from board2fen.infer import load_classifier
-from board2fen.pipeline import load_image, recognize
+from board2fen.pipeline import load_image, recognize, save_pgm
 from board2fen.positions import random_position
 from board2fen.render import render_board
 from board2fen.scene import render_scene
@@ -39,6 +40,18 @@ def test_load_image_rejects_other_files(tmp_path):
         load_image(path)
 
 
+def test_save_pgm_writes_a_header_and_raw_pixels(tmp_path):
+    gray = np.arange(12, dtype=np.uint8).reshape(3, 4)  # 3 rows, 4 columns
+    path = save_pgm(tmp_path / "small.pgm", gray)
+    assert path.read_bytes() == b"P5\n4 3\n255\n" + bytes(range(12))
+    assert np.array_equal(cv2.imread(str(path), cv2.IMREAD_UNCHANGED), gray)  # OpenCV agrees
+
+
+def test_save_pgm_rejects_color_images(tmp_path):
+    with pytest.raises(ValueError):
+        save_pgm(tmp_path / "color.pgm", np.zeros((4, 4, 3), np.uint8))
+
+
 def test_recognize_photos(classifier):
     right = 0
     for seed in range(3_000_000, 3_000_005):  # test photos, never trained on
@@ -66,3 +79,13 @@ def test_recognize_a_board_seen_from_blacks_side(classifier):
     screenshot = np.asarray(render_board(seen_from_black, square_px=40))
     result = recognize(screenshot, classifier, detect=False, flipped=True, turn="b")
     assert result.fen.split()[:2] == [POSITION, "b"]
+
+
+def test_recognize_returns_the_straightened_board(classifier):
+    screenshot = np.asarray(render_board(chess.Board(POSITION), square_px=40))
+    result = recognize(screenshot, classifier, detect=False)
+    assert result.board.shape == (8 * classifier.img_size, 8 * classifier.img_size)
+    assert result.board.dtype == np.uint8
+    # The board is exactly what the classifier saw: classifying it again gives the same labels.
+    squares = split_squares(result.board, classifier.img_size)
+    assert np.array_equal(classifier.predict(squares).argmax(axis=1), result.labels)
