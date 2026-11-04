@@ -5,6 +5,7 @@ from board2fen.evaluation import (
     error_gallery,
     format_confusion,
     per_class_accuracy,
+    square_metrics,
     top_confusions,
 )
 from board2fen.labels import CLASSES
@@ -44,3 +45,15 @@ def test_error_gallery_shows_only_the_mistakes():
     gallery = error_gallery(squares, TRUTH, PREDICTED, columns=8)
     assert gallery.shape == (32 * 3 + 14, 8 * 32 * 3)  # 2 mistakes fit in one row
     assert error_gallery(squares, TRUTH, TRUTH) is None
+
+def test_square_metrics_are_not_fooled_by_empty_squares():
+    true = np.zeros((2, 64), int)
+    true[:, 0] = CLASSES.index("P")  # 2 boards, each with 1 white pawn and 63 empty squares
+    predicted = np.zeros((2, 64), int)  # a "model" that always answers "empty"
+    predicted[0, 0] = CLASSES.index("K")  # except once: a piece is there, but the wrong one
+    metrics = square_metrics(true, predicted)
+    assert metrics["squares"] == 126 / 128
+    assert metrics["occupied"] == 127 / 128
+    assert metrics["pieces"] == 0.0
+    assert metrics["boards"] == 0.0
+    assert square_metrics(true, true)["boards"] == 1.0

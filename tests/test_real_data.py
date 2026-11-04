@@ -1,10 +1,17 @@
+import subprocess
+import sys
 import zipfile
+from pathlib import Path
 
+import chess
 import numpy as np
 import pytest
 
 from board2fen.labels import CLASS_TO_INDEX
 from board2fen.real_data import extract_dataset, find_photos, labels_from_filename
+from board2fen.render import render_board
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_labels_from_filename_reads_the_placement():
@@ -44,3 +51,16 @@ def test_extract_dataset_keeps_only_the_wanted_files(tmp_path):
     extract_dataset(archive, target, ("LICENSE.md", "photos/"))
     files = sorted(path.relative_to(target).as_posix() for path in target.rglob("*") if path.is_file())
     assert files == ["LICENSE.md", "photos/a.jpg"]
+
+
+def test_evaluate_real_script_on_rendered_boards(tmp_path):
+    pytest.importorskip("onnxruntime")
+    model = ROOT / "models" / "square_classifier_int8.onnx"
+    for placement in ("r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R", "8/8/8/4k3/8/8/4K3/8"):
+        image = render_board(chess.Board(placement + " w - - 0 1"), square_px=40)
+        image.save(tmp_path / (placement.replace("/", "-") + ".png"))
+    command = [sys.executable, str(ROOT / "scripts" / "evaluate_real.py"), "--dir", str(tmp_path)]
+    command += ["--no-detect", "--model", str(model), "--out-dir", str(tmp_path / "out")]
+    output = subprocess.run(command, capture_output=True, text=True, check=True).stdout
+    assert "2 photos" in output
+    assert "boards: 100.00%" in output

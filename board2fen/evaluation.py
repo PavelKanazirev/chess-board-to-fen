@@ -90,3 +90,20 @@ def ms_per_board(classifier: SquareClassifier, squares: np.ndarray, runs: int = 
         classifier.predict(board)
         times.append((time.perf_counter() - start) * 1000)
     return float(np.median(times))
+
+
+def square_metrics(true: np.ndarray, predicted: np.ndarray) -> dict[str, float]:
+    """How good the predictions for whole boards are. Both arrays have 64 labels per board.
+
+    Most squares are empty, so ``squares`` alone flatters a model that hardly knows any piece:
+    ``occupied`` asks only "is there a piece?", ``pieces`` scores just the squares that hold one, and
+    ``boards`` is the fraction of boards with all 64 squares right.
+    """
+    right = true == predicted
+    has_piece = true != CLASSES.index("empty")
+    return {
+        "squares": float(right.mean()),
+        "occupied": float((has_piece == (predicted != CLASSES.index("empty"))).mean()),
+        "pieces": float(right[has_piece].mean()),
+        "boards": float(right.reshape(-1, 64).all(axis=1).mean()),
+    }
