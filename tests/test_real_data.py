@@ -1,8 +1,10 @@
+import zipfile
+
 import numpy as np
 import pytest
 
 from board2fen.labels import CLASS_TO_INDEX
-from board2fen.real_data import find_photos, labels_from_filename
+from board2fen.real_data import extract_dataset, find_photos, labels_from_filename
 
 
 def test_labels_from_filename_reads_the_placement():
@@ -30,3 +32,15 @@ def test_find_photos_is_sorted_and_skips_other_files(tmp_path):
     for name in ("b.JPG", "a.png", "notes.txt"):
         (tmp_path / name).touch()
     assert [path.name for path in find_photos(tmp_path)] == ["a.png", "b.JPG"]
+
+
+def test_extract_dataset_keeps_only_the_wanted_files(tmp_path):
+    archive = tmp_path / "dataset.zip"
+    with zipfile.ZipFile(archive, "w") as zip_file:
+        zip_file.writestr("repo-abc123/LICENSE.md", "MIT")
+        zip_file.writestr("repo-abc123/photos/a.jpg", "pixels")
+        zip_file.writestr("repo-abc123/assets/logo.png", "not needed")
+    target = tmp_path / "dataset"
+    extract_dataset(archive, target, ("LICENSE.md", "photos/"))
+    files = sorted(path.relative_to(target).as_posix() for path in target.rglob("*") if path.is_file())
+    assert files == ["LICENSE.md", "photos/a.jpg"]
