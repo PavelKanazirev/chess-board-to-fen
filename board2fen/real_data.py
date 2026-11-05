@@ -4,6 +4,7 @@ A photo's name is the FEN's piece placement with "-" instead of "/", because "/"
 a file name, for example ``1B2b3-Kp6-8-8-2k5-8-8-8.JPG``. A second photo of the same position may
 add anything after an underscore: ``1B2b3-Kp6-8-8-2k5-8-8-8_2.jpg``.
 """
+
 import shutil
 import zipfile
 from pathlib import Path

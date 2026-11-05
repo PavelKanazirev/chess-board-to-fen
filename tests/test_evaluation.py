@@ -46,6 +46,7 @@ def test_error_gallery_shows_only_the_mistakes():
     assert gallery.shape == (32 * 3 + 14, 8 * 32 * 3)  # 2 mistakes fit in one row
     assert error_gallery(squares, TRUTH, TRUTH) is None
 
+
 def test_square_metrics_are_not_fooled_by_empty_squares():
     true = np.zeros((2, 64), int)
     true[:, 0] = CLASSES.index("P")  # 2 boards, each with 1 white pawn and 63 empty squares
