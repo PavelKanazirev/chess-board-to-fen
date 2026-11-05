@@ -49,6 +49,25 @@ pytest
 ```
 
 
+## Results on real photos
+
+The current model was trained only on rendered 2D pieces. On 500 real photos of 3D pieces taken from above ([data sources](DATA_SOURCES.md)), it fails:
+
+| Metric | Whole pipeline | With the dataset's own straightened boards | A "model" that always answers "empty" |
+|---|---|---:|---:|
+| Squares right | 56.92 % | 70.34 % | 70.14 % |
+| Occupied or empty right | 82.69 % | 97.72 % | 70.14 % |
+| Pieces right | 7.37 % | 6.75 % | 0 % |
+| Whole boards right | 0 % | 0 % | 0 % |
+
+Two separate problems show up: the detector finds the outer edge of the board mat instead of the 8 × 8 grid, and pieces seen from above look nothing like the 2D training images. Picking one of the 12 piece classes at random would get 8.3 %.
+
+```bash
+python scripts/download_data.py
+python scripts/evaluate_real.py
+```
+
+
 ## C++ demo (ONNX Runtime)
 
 [`cpp/`](cpp) is a small C++17 program that recognises a straightened board with the ONNX Runtime C++ API: no Python, TensorFlow or OpenCV, as on an embedded device whose camera pipeline already delivers a straightened grayscale frame. CMake downloads the prebuilt ONNX Runtime package once.
