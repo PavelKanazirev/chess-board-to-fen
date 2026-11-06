@@ -9,8 +9,10 @@ import pytest
 from board2fen.detect import (
     corner_error,
     detect_board,
+    fit_grid,
     line_intersection,
     order_corners,
+    refine_to_grid,
     split_squares,
     to_gray,
     warp_board,
@@ -142,3 +144,47 @@ def test_detect_board_finds_a_low_contrast_board():
     found = detect_board(paste_board(background, board_image, corners))
     assert found is not None
     assert corner_error(found, corners) < 0.03
+
+
+def test_fit_grid_finds_evenly_spaced_peaks():
+    profile = np.zeros(512)
+    profile[40 + 50 * np.arange(9)] = 10.0  # 9 borders, 50 pixels apart, starting at 40
+    profile[[5, 200, 505]] = 3.0  # weaker edges elsewhere: the letters on the margin, a piece...
+    first, last = fit_grid(profile)
+    assert first == pytest.approx(40, abs=1)
+    assert last == pytest.approx(440, abs=1)
+
+
+def test_fit_grid_keeps_the_whole_profile_without_a_clear_grid():
+    profile = np.zeros(512)
+    profile[np.minimum(64 * np.arange(9), 511)] = 10.0  # the borders of a board without a margin
+    profile[40 + 50 * np.arange(9)] = 12.0  # edges that happen to line up, only a bit stronger
+    assert fit_grid(profile) == (0.0, 512.0)
+
+
+def board_on_a_mat(margin: int):
+    """The start position on a light mat with a ``margin`` wide border, pasted into a dark scene.
+
+    Returns the scene, the outline of the whole mat, and the true corners of the 8 x 8 grid.
+    """
+    board_image = np.asarray(render_board(chess.Board(), square_px=40))  # 320 x 320
+    mat = cv2.copyMakeBorder(board_image, *[margin] * 4, cv2.BORDER_CONSTANT, value=(235, 235, 225))
+    outline = np.float32([[110, 70], [430, 90], [420, 400], [90, 390]])
+    scene = paste_board(np.full((480, 520, 3), 60, np.uint8), mat, outline)
+    # Where the grid's corners end up: the same perspective transform that placed the mat.
+    n = mat.shape[0]
+    matrix = cv2.getPerspectiveTransform(np.float32([[0, 0], [n, 0], [n, n], [0, n]]), outline)
+    near, far = margin, n - margin
+    grid = np.float32([[near, near], [far, near], [far, far], [near, far]])
+    return scene, outline, cv2.perspectiveTransform(grid[None], matrix)[0]
+
+
+def test_refine_to_grid_finds_the_squares_inside_a_margin():
+    scene, outline, grid = board_on_a_mat(margin=25)
+    assert corner_error(outline, grid) > 0.1  # the outline alone is far off
+    assert corner_error(refine_to_grid(scene, outline), grid) < 0.01
+
+
+def test_refine_to_grid_keeps_a_board_without_margin():
+    scene, outline, grid = board_on_a_mat(margin=0)
+    assert corner_error(refine_to_grid(scene, outline), grid) < 0.01
