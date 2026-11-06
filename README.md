@@ -51,16 +51,16 @@ pytest
 
 ## Results on real photos
 
-The current model was trained only on rendered 2D pieces. On 500 real photos of 3D pieces taken from above ([data sources](DATA_SOURCES.md)), it fails:
+The current model was trained only on rendered 2D pieces. On 500 real photos of 3D pieces taken from above ([data sources](DATA_SOURCES.md)), it still fails:
 
-| Metric | Whole pipeline | With the dataset's own straightened boards | A "model" that always answers "empty" |
-|---|---|---:|---:|
-| Squares right | 56.92 % | 70.34 % | 70.14 % |
-| Occupied or empty right | 82.69 % | 97.72 % | 70.14 % |
-| Pieces right | 7.37 % | 6.75 % | 0 % |
-| Whole boards right | 0 % | 0 % | 0 % |
+| Metric | Whole pipeline, first version | Whole pipeline, grid detection | With the dataset's own straightened boards | A "model" that always answers "empty" |
+|---|---:|---:|---:|---:|
+| Squares right | 56.92 % | 66.75 % | 70.34 % | 70.14 % |
+| Occupied or empty right | 82.69 % | 94.23 % | 97.72 % | 70.14 % |
+| Pieces right | 7.37 % | 6.80 % | 6.75 % | 0 % |
+| Whole boards right | 0 % | 0 % | 0 % | 0 % |
 
-Two separate problems show up: the detector finds the outer edge of the board mat instead of the 8 × 8 grid, and pieces seen from above look nothing like the 2D training images. Picking one of the 12 piece classes at random would get 8.3 %.
+The first detector found the outer edge of the board mat instead of the 8 × 8 grid. Fitting 9 evenly spaced lines to the edges inside the outline fixed most of that. The remaining problem is the classifier: pieces seen from above look nothing like the 2D training images, and picking one of the 12 piece classes at random would get 8.3 %.
 
 ```bash
 python scripts/download_data.py

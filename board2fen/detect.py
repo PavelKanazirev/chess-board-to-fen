@@ -106,6 +106,61 @@ def largest_quad(edges: np.ndarray, min_area: float) -> np.ndarray | None:
     return best
 
 
+def fit_grid(profile: np.ndarray, min_fraction: float = 0.7, min_gain: float = 2.5) -> tuple[float, float]:
+    """Where 9 evenly spaced lines (the borders of 8 squares) sit best on a 1-D edge profile.
+
+    Tries every square size from ``min_fraction`` of the largest possible one up to the largest,
+    at every start position, and keeps the lines with the strongest average edge. Returns the
+    positions of the first and the last line.
+
+    A smaller grid must be ``min_gain`` times as strong as the grid that fills the whole profile,
+    or the whole profile is returned. Without a margin, the edges of pieces can line up by chance,
+    but not that well: measured, at most 1.8 times on rendered boards, and at least 2.7 times on
+    the photos of a mat with a margin.
+    """
+    size = len(profile)
+
+    def strength(starts: np.ndarray, spacing: float) -> np.ndarray:
+        lines = np.round(starts[:, None] + spacing * np.arange(9)).astype(int)  # one row per start
+        return profile[np.minimum(lines, size - 1)].mean(axis=1)
+
+    best_score, first, last = -1.0, 0.0, float(size)
+    for spacing in np.arange(min_fraction * size / 8, size / 8 + 0.01, 0.25):
+        starts = np.arange(int(size - 8 * spacing) + 1)
+        scores = strength(starts, spacing)
+        best = int(scores.argmax())
+        if scores[best] > best_score:
+            best_score, first, last = float(scores[best]), float(starts[best]), starts[best] + 8 * spacing
+    if best_score < min_gain * strength(np.zeros(1), size / 8)[0]:
+        return 0.0, float(size)
+    return first, float(last)
+
+
+def refine_to_grid(image: np.ndarray, corners: np.ndarray, size: int = 512) -> np.ndarray:
+    """
+        The board is taken to be the largest roughly square outline in the picture's edges, shrunk to
+    the 8 x 8 grid inside it (a real board often has a margin around the squares).
+
+    Shrink a board outline to its 8 x 8 grid of squares, e.g. inside a mat with a margin.
+
+    Straightens the outline, then measures how strong the vertical edges are in every column of
+    pixels (and the horizontal edges in every row). The borders of the squares make 9 evenly
+    spaced peaks in these two profiles, which ``fit_grid`` finds. Without a margin the grid fills
+    the whole outline, and the corners stay where they are.
+    """
+    target = np.float32([[0, 0], [size, 0], [size, size], [0, size]])
+    matrix = cv2.getPerspectiveTransform(np.asarray(corners, np.float32), target)
+    board = cv2.warpPerspective(to_gray(image), matrix, (size, size), borderMode=cv2.BORDER_REPLICATE)
+    board = cv2.GaussianBlur(board, (5, 5), 0)
+    columns = np.abs(cv2.Sobel(board, cv2.CV_32F, 1, 0)).mean(axis=0)  # vertical edges per column
+    rows = np.abs(cv2.Sobel(board, cv2.CV_32F, 0, 1)).mean(axis=1)  # horizontal edges per row
+    left, right = fit_grid(columns)
+    top, bottom = fit_grid(rows)
+    grid = np.float32([[left, top], [right, top], [right, bottom], [left, bottom]])
+    # Back from the straightened picture to the photo: the inverse of the same perspective transform.
+    return cv2.perspectiveTransform(grid[None], np.linalg.inv(matrix))[0]
+
+
 def detect_board(image: np.ndarray, min_area_frac: float = 0.15) -> np.ndarray | None:
     """Find the board's 4 corners (a8, h8, h1, a1) in a photo, or None if no board is visible.
 
@@ -123,7 +178,8 @@ def detect_board(image: np.ndarray, min_area_frac: float = 0.15) -> np.ndarray |
         edges = cv2.dilate(cv2.Canny(blurred, low, high), np.ones((3, 3), np.uint8), iterations=thickening)
         quad = largest_quad(edges, min_area_frac * gray.size)
         if quad is not None:
-            return quad / scale
+            return refine_to_grid(image, quad / scale)
+
     return None
 
 
