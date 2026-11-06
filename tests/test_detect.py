@@ -188,3 +188,8 @@ def test_refine_to_grid_finds_the_squares_inside_a_margin():
 def test_refine_to_grid_keeps_a_board_without_margin():
     scene, outline, grid = board_on_a_mat(margin=0)
     assert corner_error(refine_to_grid(scene, outline), grid) < 0.01
+
+
+def test_detect_board_finds_the_grid_not_the_mat():
+    scene, _outline, grid = board_on_a_mat(margin=25)
+    assert corner_error(detect_board(scene), grid) < 0.01

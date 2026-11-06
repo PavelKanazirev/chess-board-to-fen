@@ -137,7 +137,11 @@ def fit_grid(profile: np.ndarray, min_fraction: float = 0.7, min_gain: float = 2
 
 
 def refine_to_grid(image: np.ndarray, corners: np.ndarray, size: int = 512) -> np.ndarray:
-    """Shrink a board outline to its 8 x 8 grid of squares, e.g. inside a mat with a margin.
+    """
+        The board is taken to be the largest roughly square outline in the picture's edges, shrunk to
+    the 8 x 8 grid inside it (a real board often has a margin around the squares).
+
+    Shrink a board outline to its 8 x 8 grid of squares, e.g. inside a mat with a margin.
 
     Straightens the outline, then measures how strong the vertical edges are in every column of
     pixels (and the horizontal edges in every row). The borders of the squares make 9 evenly
@@ -174,7 +178,8 @@ def detect_board(image: np.ndarray, min_area_frac: float = 0.15) -> np.ndarray |
         edges = cv2.dilate(cv2.Canny(blurred, low, high), np.ones((3, 3), np.uint8), iterations=thickening)
         quad = largest_quad(edges, min_area_frac * gray.size)
         if quad is not None:
-            return quad / scale
+            return refine_to_grid(image, quad / scale)
+
     return None
 
 
