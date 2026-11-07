@@ -44,3 +44,36 @@ def extract_dataset(archive: Path, target: Path, keep: tuple[str, ...]) -> None:
                 with zip_file.open(member) as source, path.open("wb") as destination:
                     shutil.copyfileobj(source, destination)
     partial.rename(target)
+
+
+def group_positions(labels: np.ndarray, max_changes: int = 3) -> np.ndarray:
+    """A group number for every photo; ``labels`` has 64 labels per photo.
+
+    Two photos are close if their positions differ in at most ``max_changes`` squares: one move,
+    a capture or en passant. Photos linked by a chain of close photos get the same group number,
+    so in practice a group is one game, photographed move by move.
+    """
+    close = (labels[:, None, :] != labels[None, :, :]).sum(axis=2) <= max_changes
+    group = np.arange(len(labels))
+    while True:  # every photo takes the smallest group number among its close photos, until stable
+        new = np.where(close, group[None, :], len(labels)).min(axis=1)
+        if np.array_equal(new, group):
+            return group
+        group = new
+
+
+def split_photos(photos: list[Path], test: float = 0.2, val: float = 0.1) -> dict[str, list[Path]]:
+    """Split photos into "train", "val" and "test", keeping every group (game) in one part.
+
+    A random split of single photos would put nearly identical neighbours from one game into train
+    and test, and the test would measure memory instead of recognition. So whole groups are
+    shared out, the largest first, each to the part that is furthest below its target size.
+    """
+    group = group_positions(np.stack([labels_from_filename(path) for path in photos]))
+    targets = {"train": (1 - test - val) * len(photos), "val": val * len(photos), "test": test * len(photos)}
+    parts = {name: [] for name in targets}
+    ids, sizes = np.unique(group, return_counts=True)
+    for g in ids[np.argsort(-sizes, kind="stable")]:  # largest first; ties in a fixed order
+        name = max(parts, key=lambda name: targets[name] - len(parts[name]))
+        parts[name] += [photo for photo, photo_group in zip(photos, group, strict=True) if photo_group == g]
+    return {name: sorted(members) for name, members in parts.items()}
