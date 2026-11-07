@@ -12,7 +12,9 @@ from pathlib import Path
 import chess
 import numpy as np
 
+from board2fen.detect import detect_board, split_squares, warp_board
 from board2fen.labels import board_to_labels
+from board2fen.pipeline import load_image
 
 PHOTO_SUFFIXES = {".jpg", ".jpeg", ".png"}
 
@@ -77,3 +79,12 @@ def split_photos(photos: list[Path], test: float = 0.2, val: float = 0.1) -> dic
         name = max(parts, key=lambda name: targets[name] - len(parts[name]))
         parts[name] += [photo for photo, photo_group in zip(photos, group, strict=True) if photo_group == g]
     return {name: sorted(members) for name, members in parts.items()}
+
+
+def photo_squares(path: Path, img_size: int = 32) -> tuple[np.ndarray, np.ndarray] | None:
+    """The 64 squares of a photo, cut by our own detector, and their labels; None without a board."""
+    image = load_image(path)
+    corners = detect_board(image)
+    if corners is None:
+        return None
+    return split_squares(warp_board(image, corners, img_size), img_size), labels_from_filename(path)

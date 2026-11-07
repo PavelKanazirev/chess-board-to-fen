@@ -4,6 +4,7 @@ import zipfile
 from pathlib import Path
 
 import chess
+import cv2
 import numpy as np
 import pytest
 
@@ -13,9 +14,11 @@ from board2fen.real_data import (
     find_photos,
     group_positions,
     labels_from_filename,
+    photo_squares,
     split_photos,
 )
 from board2fen.render import render_board
+from board2fen.scene import paste_board
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -110,3 +113,15 @@ def test_split_photos_keeps_every_game_in_one_part(tmp_path):
     # Largest game first, each to the part furthest below its target (7, 1 and 2 of 10 photos):
     # 6 photos -> train, 3 -> test, then 1 -> train (a tie with val; train comes first).
     assert [len(parts[name]) for name in ("train", "val", "test")] == [7, 0, 3]
+
+
+def test_photo_squares_cuts_a_photo_with_our_detector(tmp_path):
+    board = chess.Board("r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w - - 0 1")
+    board_image = np.asarray(render_board(board, square_px=40))
+    corners = np.float32([[110, 70], [430, 90], [420, 400], [90, 390]])
+    photo = paste_board(np.full((480, 520, 3), 60, np.uint8), board_image, corners)
+    path = tmp_path / (board.board_fen().replace("/", "-") + ".png")
+    cv2.imwrite(str(path), cv2.cvtColor(photo, cv2.COLOR_RGB2BGR))
+    squares, labels = photo_squares(path)
+    assert squares.shape == (64, 32, 32)
+    assert labels.tolist() == board_to_labels(board)
