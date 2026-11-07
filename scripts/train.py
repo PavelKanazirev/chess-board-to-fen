@@ -4,6 +4,11 @@ Usage:
     python scripts/train.py --epochs 10
     python scripts/train.py --epochs 1 --train data/smoke/train.npz --val data/smoke/val.npz
 
+Fine-tune the trained model on rendered and real squares; a file given twice is used twice as often:
+    python scripts/train.py --init models/square_classifier.keras --learning-rate 3e-4
+                            --train data/train.npz data/real/train.npz data/real/train.npz
+                            --val data/val.npz data/real/val.npz
+
 Saves the trained model (.keras) and the per-epoch history (.history.csv) next to each other.
 """
 
