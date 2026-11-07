@@ -4,6 +4,11 @@ Usage:
     python scripts/train.py --epochs 10
     python scripts/train.py --epochs 1 --train data/smoke/train.npz --val data/smoke/val.npz
 
+Fine-tune the trained model on rendered and real squares; a file given twice is used twice as often:
+    python scripts/train.py --init models/square_classifier.keras --learning-rate 3e-4
+                            --train data/train.npz data/real/train.npz data/real/train.npz
+                            --val data/val.npz data/real/val.npz
+
 Saves the trained model (.keras) and the per-epoch history (.history.csv) next to each other.
 """
 
@@ -11,18 +16,26 @@ import argparse
 from pathlib import Path
 
 import keras
+import numpy as np
 
 from board2fen.dataset import load
 from board2fen.model import build_model, compile_model
 from board2fen.training import make_dataset
 
 
+def load_all(paths: list[Path]) -> tuple[np.ndarray, np.ndarray]:
+    """Several datasets as one."""
+    parts = [load(path) for path in paths]
+    return np.concatenate([part[0] for part in parts]), np.concatenate([part[1] for part in parts])
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--train", type=Path, default=Path("data/train.npz"))
-    parser.add_argument("--val", type=Path, default=Path("data/val.npz"))
+    parser.add_argument("--train", type=Path, nargs="+", default=[Path("data/train.npz")])
+    parser.add_argument("--val", type=Path, nargs="+", default=[Path("data/val.npz")])
+    parser.add_argument("--init", type=Path, help="start from this trained model instead of a new one")
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
@@ -31,12 +44,14 @@ def main() -> None:
     args = parser.parse_args()
 
     keras.utils.set_random_seed(args.seed)  # Python, numpy and TensorFlow random numbers
-    train_squares, train_labels = load(args.train)
-    val_squares, val_labels = load(args.val)
+    train_squares, train_labels = load_all(args.train)
+    val_squares, val_labels = load_all(args.val)
     train_data = make_dataset(train_squares, train_labels, args.batch_size, training=True, seed=args.seed)
     val_data = make_dataset(val_squares, val_labels, args.batch_size)
 
-    model = compile_model(build_model(train_squares.shape[1]), args.learning_rate)
+    model = keras.models.load_model(args.init) if args.init else build_model(train_squares.shape[1])
+    model = compile_model(model, args.learning_rate)
+
     model.summary()
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

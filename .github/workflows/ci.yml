@@ -30,6 +30,8 @@ jobs:
         run: python scripts/generate_dataset.py --boards 8 --val-boards 4 --out-dir /tmp/smoke
       - name: Training script smoke test
         run: python scripts/train.py --epochs 1 --train /tmp/smoke/train.npz --val /tmp/smoke/val.npz --out /tmp/smoke/model.keras
+      - name: Fine-tuning smoke test
+        run: python scripts/train.py --epochs 1 --init /tmp/smoke/model.keras --train /tmp/smoke/train.npz /tmp/smoke/train.npz --val /tmp/smoke/val.npz --out /tmp/smoke/finetuned.keras
       - name: Evaluation script smoke test
         run: python scripts/evaluate_model.py --test-boards 5 --scenes 3 --out-dir /tmp/evaluation
       - name: Prediction script smoke test

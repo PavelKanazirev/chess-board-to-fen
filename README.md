@@ -51,20 +51,22 @@ pytest
 
 ## Results on real photos
 
-The current model was trained only on rendered 2D pieces. On 500 real photos of 3D pieces taken from above ([data sources](DATA_SOURCES.md)), it still fails:
+500 real photos of 3D pieces taken from above ([data sources](DATA_SOURCES.md)) are split **by game**: positions that follow each other move by move always stay in the same part, so the 100 test photos come from games the model has never seen. The model is fine-tuned on 350 photos (plus the rendered data, so it doesn't forget it); 50 photos are for validation.
 
-| Metric | Whole pipeline, first version | Whole pipeline, grid detection | With the dataset's own straightened boards | A "model" that always answers "empty" |
-|---|---:|---:|---:|---:|
-| Squares right | 56.92 % | 66.75 % | 70.34 % | 70.14 % |
-| Occupied or empty right | 82.69 % | 94.23 % | 97.72 % | 70.14 % |
-| Pieces right | 7.37 % | 6.80 % | 6.75 % | 0 % |
-| Whole boards right | 0 % | 0 % | 0 % | 0 % |
+| Test photos (100, unseen games) | Trained on rendered boards only | Fine-tuned on real photos |
+|---|---:|---:|
+| Squares right | 77.03 % | 97.62 % |
+| Occupied or empty right | 94.61 % | 99.22 % |
+| Pieces right | 8.73 % | **90.24 %** |
+| Whole boards right | 0 % | **32 %** |
 
-The first detector found the outer edge of the board mat instead of the 8 × 8 grid. Fitting 9 evenly spaced lines to the edges inside the outline fixed most of that. The remaining problem is the classifier: pieces seen from above look nothing like the 2D training images, and picking one of the 12 piece classes at random would get 8.3 %.
+The int8 ONNX model gives the same results (90.48 % of pieces, 35 whole boards), and the rendered test data stays at 99.96 % of squares. The most frequent mistakes are queens and kings, which look much alike from above.
+
+Splitting single photos at random instead of by game makes the same short training look 15 points better on pieces (86 % instead of 71 %), because the test photos then have nearly identical neighbours in the training data. All photos show one board and one set of pieces, so results on other boards will be lower.
 
 ```bash
 python scripts/download_data.py
-python scripts/evaluate_real.py
+python scripts/evaluate_real.py --split test
 ```
 
 

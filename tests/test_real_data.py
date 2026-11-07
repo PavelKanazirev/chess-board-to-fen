@@ -4,12 +4,21 @@ import zipfile
 from pathlib import Path
 
 import chess
+import cv2
 import numpy as np
 import pytest
 
-from board2fen.labels import CLASS_TO_INDEX
-from board2fen.real_data import extract_dataset, find_photos, labels_from_filename
+from board2fen.labels import CLASS_TO_INDEX, board_to_labels
+from board2fen.real_data import (
+    extract_dataset,
+    find_photos,
+    group_positions,
+    labels_from_filename,
+    photo_squares,
+    split_photos,
+)
 from board2fen.render import render_board
+from board2fen.scene import paste_board
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -64,3 +73,55 @@ def test_evaluate_real_script_on_rendered_boards(tmp_path):
     output = subprocess.run(command, capture_output=True, text=True, check=True).stdout
     assert "2 photos" in output
     assert "boards: 100.00%" in output
+
+
+def game(start_fen: str, moves: int) -> list[chess.Board]:
+    """The positions of a game played from ``start_fen``: always the first legal move."""
+    board = chess.Board(start_fen)
+    positions = [board.copy()]
+    for _ in range(moves):
+        board.push(next(iter(board.legal_moves)))
+        positions.append(board.copy())
+    return positions
+
+
+def test_group_positions_links_a_game_move_by_move():
+    positions = game(chess.STARTING_FEN, 3) + [chess.Board("8/8/8/4k3/8/8/4K3/8 w - - 0 1")]
+    labels = np.stack([np.array(board_to_labels(board)) for board in positions])
+    group = group_positions(labels)
+    assert len(set(group[:4])) == 1  # the 4 positions of the game belong together
+    assert group[4] != group[0]  # the lone kings don't
+
+
+def test_split_photos_keeps_every_game_in_one_part(tmp_path):
+    games = [
+        game(chess.STARTING_FEN, 5),  # 6 photos
+        game("4k3/8/8/8/8/8/8/R3K3 w - - 0 1", 2),  # 3 photos
+        game("7k/8/8/8/8/8/8/K6Q w - - 0 1", 0),  # 1 photo
+    ]
+    photo_game = {}
+    for number, positions in enumerate(games):
+        for board in positions:
+            path = tmp_path / (board.board_fen().replace("/", "-") + ".jpg")
+            path.touch()
+            photo_game[path] = number
+    parts = split_photos(find_photos(tmp_path))
+    part_of = {path: name for name, part in parts.items() for path in part}
+    assert sorted(part_of) == sorted(photo_game)  # every photo in exactly one part
+    for number in range(len(games)):
+        assert len({part_of[path] for path, g in photo_game.items() if g == number}) == 1
+    # Largest game first, each to the part furthest below its target (7, 1 and 2 of 10 photos):
+    # 6 photos -> train, 3 -> test, then 1 -> train (a tie with val; train comes first).
+    assert [len(parts[name]) for name in ("train", "val", "test")] == [7, 0, 3]
+
+
+def test_photo_squares_cuts_a_photo_with_our_detector(tmp_path):
+    board = chess.Board("r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w - - 0 1")
+    board_image = np.asarray(render_board(board, square_px=40))
+    corners = np.float32([[110, 70], [430, 90], [420, 400], [90, 390]])
+    photo = paste_board(np.full((480, 520, 3), 60, np.uint8), board_image, corners)
+    path = tmp_path / (board.board_fen().replace("/", "-") + ".png")
+    cv2.imwrite(str(path), cv2.cvtColor(photo, cv2.COLOR_RGB2BGR))
+    squares, labels = photo_squares(path)
+    assert squares.shape == (64, 32, 32)
+    assert labels.tolist() == board_to_labels(board)
