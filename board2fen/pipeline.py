@@ -9,7 +9,7 @@ import numpy as np
 
 from board2fen.detect import detect_board, order_corners, split_squares, warp_board
 from board2fen.infer import SquareClassifier
-from board2fen.labels import labels_to_fen
+from board2fen.labels import CLASSES, labels_to_fen
 
 
 @dataclass
@@ -103,3 +103,36 @@ def load_corners(photo: str | Path) -> np.ndarray | None:
     if not path.exists():
         return None
     return np.float32(json.loads(path.read_text())["corners"])
+
+
+def draw_result(image: np.ndarray, result: Recognition) -> np.ndarray:
+    """A copy of the picture with the grid that was used and the piece recognised on every square.
+
+    The grid is green. Letters are yellow, or red where the model is less than 90 % sure. It shows
+    at a glance whether a mistake comes from the detector (grid off) or from the classifier.
+    """
+    picture = image.copy()
+    side = float(np.linalg.norm(result.corners[1] - result.corners[0]))
+    thickness = max(1, round(side / 300))
+    # The perspective transform from "board coordinates" (0..8 squares) to the picture.
+    unit = np.float32([[0, 0], [8, 0], [8, 8], [0, 8]])
+    matrix = cv2.getPerspectiveTransform(unit, np.float32(result.corners))
+    lines = np.float32([[x, y] for y in range(9) for x in range(9)])
+    points = cv2.perspectiveTransform(lines[None], matrix)[0].reshape(9, 9, 2).astype(np.int32)
+    columns = np.ascontiguousarray(points.transpose(1, 0, 2))  # OpenCV needs gap-free arrays
+    for line in (*points, *columns):  # 9 rows, then 9 columns of grid points
+        cv2.polylines(picture, [line], False, (0, 255, 0), thickness)
+    centres = np.float32([[col + 0.5, row + 0.5] for row in range(8) for col in range(8)])
+    scale = side / 8 / 40  # letters about half a square high
+    for index, (x, y) in enumerate(cv2.perspectiveTransform(centres[None], matrix)[0]):
+        name = CLASSES[result.labels[index]]
+        if name == "empty":
+            continue
+        colour = (255, 255, 0) if result.confidences[index] >= 0.9 else (255, 0, 0)
+        (width, height), _ = cv2.getTextSize(name, cv2.FONT_HERSHEY_SIMPLEX, scale, thickness)
+        origin = (int(x - width / 2), int(y + height / 2))
+        cv2.putText(
+            picture, name, origin, cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), thickness * 3
+        )  # outline
+        cv2.putText(picture, name, origin, cv2.FONT_HERSHEY_SIMPLEX, scale, colour, thickness)
+    return picture

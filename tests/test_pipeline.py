@@ -9,7 +9,8 @@ from PIL import Image
 
 from board2fen.detect import split_squares
 from board2fen.infer import load_classifier
-from board2fen.pipeline import load_corners, load_image, recognize, save_corners, save_pgm
+from board2fen.labels import CLASSES
+from board2fen.pipeline import draw_result, load_corners, load_image, recognize, save_corners, save_pgm
 from board2fen.positions import random_position
 from board2fen.render import render_board
 from board2fen.scene import render_scene
@@ -125,3 +126,26 @@ def test_recognize_uses_given_corners():
     assert result.detected
     assert np.array_equal(result.corners, corners)
     assert not recognize(image, AlwaysEmpty()).detected
+
+
+def test_draw_result_draws_the_grid_and_the_pieces():
+    class SureAboutPawns:
+        img_size = 32
+
+        def predict(self, squares):
+            probabilities = np.zeros((len(squares), 13), np.float32)
+            probabilities[:, 0] = 1.0  # empty...
+            probabilities[:8] = 0.0
+            probabilities[:8, CLASSES.index("p")] = 1.0  # ...except for 8 black pawns on rank 8
+            return probabilities
+
+    image = np.full((300, 400, 3), 128, np.uint8)
+    corners = np.float32([[50, 20], [350, 30], [340, 280], [60, 270]])
+    result = recognize(image, SureAboutPawns(), corners=corners)
+    picture = draw_result(image, result)
+    assert picture.shape == image.shape
+    assert (image == 128).all()  # the original stays untouched
+    assert (picture[20:32, 200] == [0, 255, 0]).all(axis=1).any()  # the top edge of the grid is green
+    rank_8 = picture[30:55, 60:340]
+    assert (rank_8 == [255, 255, 0]).all(axis=2).any()  # yellow letters on the first row of squares
+    assert not (picture[230:265, 70:330] == [255, 255, 0]).all(axis=2).any()  # none on rank 1
