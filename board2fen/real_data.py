@@ -14,7 +14,7 @@ import numpy as np
 
 from board2fen.detect import detect_board, split_squares, warp_board
 from board2fen.labels import board_to_labels
-from board2fen.pipeline import load_image
+from board2fen.pipeline import load_corners, load_image
 
 PHOTO_SUFFIXES = {".jpg", ".jpeg", ".png"}
 
@@ -82,9 +82,13 @@ def split_photos(photos: list[Path], test: float = 0.2, val: float = 0.1) -> dic
 
 
 def photo_squares(path: Path, img_size: int = 32) -> tuple[np.ndarray, np.ndarray] | None:
-    """The 64 squares of a photo, cut by our own detector, and their labels; None without a board."""
+    """The 64 squares of a photo and their labels, None without a board.
+
+    Cut with the hand-clicked corners if the photo has them, otherwise by our own detector.
+    """
     image = load_image(path)
-    corners = detect_board(image)
+    corners = load_corners(path)
     if corners is None:
-        return None
+        corners = detect_board(image)
+
     return split_squares(warp_board(image, corners, img_size), img_size), labels_from_filename(path)

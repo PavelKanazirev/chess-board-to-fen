@@ -7,6 +7,8 @@ Usage:
     python scripts/predict.py --render 42                     # try it on a rendered test photo
     python scripts/predict.py photo.jpg --save-board board.pgm  # input for the C++ demo
 
+    If photo.corners.json exists (see scripts/click_corners.py), its corners are used instead of the detector.
+
 """
 
 import argparse
@@ -19,7 +21,7 @@ import cv2
 
 from board2fen.infer import load_classifier
 from board2fen.labels import lichess_analysis_url, square_of_index
-from board2fen.pipeline import load_image, recognize, save_pgm
+from board2fen.pipeline import corners_file, load_corners, load_image, recognize, save_pgm
 from board2fen.positions import random_position
 from board2fen.scene import render_scene
 
@@ -39,7 +41,7 @@ def main() -> None:
     if (args.image is None) == (args.render is None):
         parser.error("give either an image file or --render SEED")
 
-    expected = None
+    expected, corners = None, None
     if args.render is not None:
         rng = random.Random(args.render)
         board = random_position(rng)
@@ -51,11 +53,15 @@ def main() -> None:
         print(f"rendered test photo -> {path}")
     else:
         image = load_image(args.image)
+        corners = load_corners(args.image)
+        if corners is not None:
+            print(f"corners from {corners_file(args.image)}")
 
     classifier = load_classifier(args.model)
     start = time.perf_counter()
     turn = "b" if args.black else "w"
-    result = recognize(image, classifier, detect=not args.no_detect, flipped=args.flip, turn=turn)
+    detect = not args.no_detect
+    result = recognize(image, classifier, detect=detect, flipped=args.flip, turn=turn, corners=corners)
     elapsed_ms = (time.perf_counter() - start) * 1000
 
     print(result.fen)

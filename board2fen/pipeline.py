@@ -1,12 +1,13 @@
 """The whole recognition: photo -> board detection -> 64 squares -> classifier -> FEN."""
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
 import numpy as np
 
-from board2fen.detect import detect_board, split_squares, warp_board
+from board2fen.detect import detect_board, order_corners, split_squares, warp_board
 from board2fen.infer import SquareClassifier
 from board2fen.labels import labels_to_fen
 
@@ -20,7 +21,7 @@ class Recognition:
     confidences: np.ndarray  # (64,) probability of the chosen class
     corners: np.ndarray  # (4, 2) board corners that were used
     board: np.ndarray  # the straightened grayscale board, (8 * img_size, 8 * img_size)
-    detected: bool  # False: no board was found, the whole picture was used
+    detected: bool  # False: no corners, so the whole picture was used
 
 
 def recognize(
@@ -29,15 +30,19 @@ def recognize(
     detect: bool = True,
     flipped: bool = False,
     turn: str = "w",
+    corners: np.ndarray | None = None,
 ) -> Recognition:
     """Recognise the position in an RGB picture.
 
     ``detect=False`` treats the whole picture as the board (a cropped screenshot). ``flipped``
     means the picture was taken from Black's side, and ``turn`` is the side to move, which a
-    picture can't show.
+    picture can't show. Given ``corners`` (a8, h8, h1, a1), e.g. clicked by hand, are used
+    instead of detecting the board.
+
     """
     height, width = image.shape[:2]
-    corners = detect_board(image) if detect else None
+    if corners is None and detect:
+        corners = detect_board(image)
 
     detected = corners is not None
     if corners is None:
@@ -77,3 +82,24 @@ def save_pgm(path: str | Path, gray: np.ndarray) -> Path:
     path = Path(path)
     path.write_bytes(f"P5\n{width} {height}\n255\n".encode("ascii") + gray.tobytes())
     return path
+
+
+def corners_file(photo: str | Path) -> Path:
+    """Where the hand-clicked corners of a photo are kept: next to it, board.jpg -> board.corners.json."""
+    return Path(photo).with_suffix(".corners.json")
+
+
+def save_corners(photo: str | Path, corners: np.ndarray) -> Path:
+    """Store a photo's board corners, sorted into the order a8, h8, h1, a1."""
+    path = corners_file(photo)
+    corners = np.round(order_corners(corners), 1)  # a tenth of a pixel is plenty
+    path.write_text(json.dumps({"corners": corners.tolist()}, indent=2))
+    return path
+
+
+def load_corners(photo: str | Path) -> np.ndarray | None:
+    """The hand-clicked corners of a photo, or None if it has none."""
+    path = corners_file(photo)
+    if not path.exists():
+        return None
+    return np.float32(json.loads(path.read_text())["corners"])
