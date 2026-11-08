@@ -70,6 +70,15 @@ python scripts/evaluate_real.py --split test
 ```
 
 
+## Testing on your own photos
+
+1. Photograph the board from straight above, in good light, with all 64 squares and White at the bottom.
+2. Set up the same position in the [lichess board editor](https://lichess.org/editor), and name the photo after the first part of the FEN, with `-` instead of `/`: `r1bqkbnr-pppp1ppp-2n5-4p3-4P3-5N2-PPPP1PPP-RNBQKB1R.jpg`. A second photo of the same position can end in `_2.jpg`.
+3. Check what the pipeline sees: `python scripts/predict.py <photo> --debug debug.png` draws the grid it used and the piece it found on every square.
+4. If the grid is wrong, click the 4 corners of the squares by hand: `python scripts/click_corners.py <photo>`. That saves `<photo>.corners.json`, which every script then uses instead of the detector.
+5. Measure a whole folder: `python scripts/evaluate_real.py --dir data/real/my_photos`.
+
+
 ## C++ demo (ONNX Runtime)
 
 [`cpp/`](cpp) is a small C++17 program that recognises a straightened board with the ONNX Runtime C++ API: no Python, TensorFlow or OpenCV, as on an embedded device whose camera pipeline already delivers a straightened grayscale frame. CMake downloads the prebuilt ONNX Runtime package once.

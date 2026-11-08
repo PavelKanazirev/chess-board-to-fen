@@ -5,10 +5,12 @@ import chess
 import cv2
 import numpy as np
 import pytest
+from PIL import Image
 
 from board2fen.detect import split_squares
 from board2fen.infer import load_classifier
-from board2fen.pipeline import load_image, recognize, save_pgm
+from board2fen.labels import CLASSES
+from board2fen.pipeline import draw_result, load_corners, load_image, recognize, save_corners, save_pgm
 from board2fen.positions import random_position
 from board2fen.render import render_board
 from board2fen.scene import render_scene
@@ -89,3 +91,61 @@ def test_recognize_returns_the_straightened_board(classifier):
     # The board is exactly what the classifier saw: classifying it again gives the same labels.
     squares = split_squares(result.board, classifier.img_size)
     assert np.array_equal(classifier.predict(squares).argmax(axis=1), result.labels)
+
+
+def test_load_image_turns_phone_photos_upright(tmp_path):
+    # Phones store the picture as the sensor saw it, plus an EXIF tag that says how to turn it.
+    image = Image.new("RGB", (40, 20), (255, 0, 0))  # wide
+    exif = Image.Exif()
+    exif[0x0112] = 6  # "Orientation": show it turned by 90 degrees clockwise
+    image.save(tmp_path / "phone.jpg", exif=exif)
+    assert load_image(tmp_path / "phone.jpg").shape == (40, 20, 3)  # tall, as the phone showed it
+
+
+def test_corners_round_trip_next_to_the_photo(tmp_path):
+    photo = tmp_path / "8-8-8-8-8-8-8-K7.jpg"
+    assert load_corners(photo) is None
+    clicked = np.float32([[90, 390], [110, 70], [420, 400], [430, 90]])  # clicked in any order
+    path = save_corners(photo, clicked)
+    assert path.name == "8-8-8-8-8-8-8-K7.corners.json"
+    assert load_corners(photo).tolist() == [[110, 70], [430, 90], [420, 400], [90, 390]]  # a8 h8 h1 a1
+
+
+def test_recognize_uses_given_corners():
+    class AlwaysEmpty:
+        img_size = 32
+
+        def predict(self, squares):
+            probabilities = np.zeros((len(squares), 13), np.float32)
+            probabilities[:, 0] = 1.0
+            return probabilities
+
+    image = np.full((300, 400, 3), 128, np.uint8)  # no board to detect
+    corners = np.float32([[50, 20], [350, 30], [340, 280], [60, 270]])
+    result = recognize(image, AlwaysEmpty(), corners=corners)
+    assert result.detected
+    assert np.array_equal(result.corners, corners)
+    assert not recognize(image, AlwaysEmpty()).detected
+
+
+def test_draw_result_draws_the_grid_and_the_pieces():
+    class SureAboutPawns:
+        img_size = 32
+
+        def predict(self, squares):
+            probabilities = np.zeros((len(squares), 13), np.float32)
+            probabilities[:, 0] = 1.0  # empty...
+            probabilities[:8] = 0.0
+            probabilities[:8, CLASSES.index("p")] = 1.0  # ...except for 8 black pawns on rank 8
+            return probabilities
+
+    image = np.full((300, 400, 3), 128, np.uint8)
+    corners = np.float32([[50, 20], [350, 30], [340, 280], [60, 270]])
+    result = recognize(image, SureAboutPawns(), corners=corners)
+    picture = draw_result(image, result)
+    assert picture.shape == image.shape
+    assert (image == 128).all()  # the original stays untouched
+    assert (picture[20:32, 200] == [0, 255, 0]).all(axis=1).any()  # the top edge of the grid is green
+    rank_8 = picture[30:55, 60:340]
+    assert (rank_8 == [255, 255, 0]).all(axis=2).any()  # yellow letters on the first row of squares
+    assert not (picture[230:265, 70:330] == [255, 255, 0]).all(axis=2).any()  # none on rank 1

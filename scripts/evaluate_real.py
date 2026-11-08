@@ -27,7 +27,7 @@ from board2fen.evaluation import (
 )
 from board2fen.infer import load_classifier
 from board2fen.labels import CLASSES
-from board2fen.pipeline import load_image, recognize
+from board2fen.pipeline import load_corners, load_image, recognize
 from board2fen.real_data import find_photos, labels_from_filename, split_photos
 
 
@@ -58,7 +58,8 @@ def main() -> None:
     true, predicted, squares = [], [], []
     detected = 0
     for path in photos:
-        result = recognize(load_image(path), classifier, detect=not args.no_detect)
+        corners = load_corners(path)  # clicked by hand, if the detector failed on this photo
+        result = recognize(load_image(path), classifier, detect=not args.no_detect, corners=corners)
         true.append(labels_from_filename(path))
         predicted.append(result.labels)
         squares.append(split_squares(result.board, classifier.img_size))
